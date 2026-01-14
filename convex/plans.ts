@@ -118,10 +118,9 @@ export const getTodayTemplate = query({
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
     
-    // Get weekday (0=Monday, 6=Sunday)
+    // Get weekday (0=Sunday, 6=Saturday - matches JS Date.getDay())
     const dateObj = new Date(args.date);
-    const jsWeekday = dateObj.getUTCDay(); // 0=Sunday, 6=Saturday
-    const weekday = jsWeekday === 0 ? 6 : jsWeekday - 1; // Convert to 0=Monday
+    const weekday = dateObj.getUTCDay();
 
     const plan = await ctx.db
       .query("plans")

@@ -23,10 +23,9 @@ export const getOrCreateSession = mutation({
       return existingSession._id;
     }
 
-    // Calculate weekday
+    // Calculate weekday (0=Sunday, 6=Saturday - matches JS Date.getDay())
     const dateObj = new Date(args.date);
-    const jsWeekday = dateObj.getUTCDay();
-    const weekday = jsWeekday === 0 ? 6 : jsWeekday - 1;
+    const weekday = dateObj.getUTCDay();
 
     // Create new session
     return await ctx.db.insert("sessions", {

@@ -39,16 +39,15 @@ export default function DashboardPage() {
   }
 
   const dayNames = [
+    "Sunday",
     "Monday",
     "Tuesday",
     "Wednesday",
     "Thursday",
     "Friday",
     "Saturday",
-    "Sunday",
   ];
-  const jsWeekday = new Date().getDay();
-  const weekday = jsWeekday === 0 ? 6 : jsWeekday - 1;
+  const weekday = new Date().getDay(); // 0=Sunday, 6=Saturday
   const todayName = dayNames[weekday];
 
   const thisWeekStats = weeklyStats?.[weeklyStats.length - 1];
