@@ -9,6 +9,7 @@ export default defineSchema({
     displayName: v.optional(v.string()),
     units: v.optional(v.union(v.literal("kg"), v.literal("lb"))),
     goals: v.optional(v.string()),
+    aiUsageCount: v.optional(v.number()), // Track AI plan generation usage
     createdAt: v.number(),
   })
     .index("by_clerk_id", ["clerkUserId"])

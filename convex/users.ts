@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAuth } from "./auth";
 
+const MAX_FREE_AI_USES = 3;
+
 // Get current user's profile
 export const getCurrentUser = query({
   args: {},
@@ -45,6 +47,7 @@ export const upsertProfile = mutation({
         displayName: args.displayName,
         units: args.units ?? "lb",
         goals: args.goals,
+        aiUsageCount: 0,
         createdAt: Date.now(),
       });
     }
@@ -68,10 +71,62 @@ export const ensureUser = mutation({
         clerkUserId: userId,
         email: identity?.email ?? "",
         units: "lb",
+        aiUsageCount: 0,
         createdAt: Date.now(),
       });
     }
     
     return existingUser._id;
+  },
+});
+
+// Increment AI usage count
+export const incrementAIUsage = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireAuth(ctx);
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const currentUsage = user.aiUsageCount ?? 0;
+    await ctx.db.patch(user._id, {
+      aiUsageCount: currentUsage + 1,
+    });
+
+    return { usageCount: currentUsage + 1 };
+  },
+});
+
+// Get AI usage info
+export const getAIUsage = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireAuth(ctx);
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
+      .unique();
+
+    if (!user) {
+      return { usageCount: 0, remaining: MAX_FREE_AI_USES, limit: MAX_FREE_AI_USES };
+    }
+
+    const usageCount = user.aiUsageCount ?? 0;
+    const remaining = Math.max(0, MAX_FREE_AI_USES - usageCount);
+
+    return {
+      usageCount,
+      remaining,
+      limit: MAX_FREE_AI_USES,
+      isLimitReached: usageCount >= MAX_FREE_AI_USES,
+    };
   },
 });

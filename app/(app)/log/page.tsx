@@ -297,7 +297,7 @@ export default function LogPage() {
                           <tr className="text-left text-sm text-muted-foreground border-b border-border">
                             <th className="pb-2 font-medium">Set</th>
                             <th className="pb-2 font-medium">Target</th>
-                            <th className="pb-2 font-medium">Weight (lb)</th>
+                            <th className="pb-2 font-medium">Weight</th>
                             <th className="pb-2 font-medium">Reps</th>
                             <th className="pb-2"></th>
                           </tr>

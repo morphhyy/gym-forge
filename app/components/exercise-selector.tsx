@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Search, Plus, X, Check, Dumbbell } from "lucide-react";
+import { toast } from "sonner";
 
 interface ExerciseSelectorProps {
   onSelect: (exerciseId: Id<"exercises">, exerciseName: string) => void;
@@ -22,12 +23,21 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
 
   const muscleGroups = useMemo(() => {
     if (!exercises) return [];
-    const groups = new Set(exercises.map((e: { muscleGroup?: string }) => e.muscleGroup).filter(Boolean));
+    const groups = new Set(
+      exercises
+        .map((e: { muscleGroup?: string }) => e.muscleGroup)
+        .filter(Boolean)
+    );
     return Array.from(groups).sort() as string[];
   }, [exercises]);
 
-  type Exercise = { _id: string; name: string; muscleGroup?: string; equipment?: string };
-  
+  type Exercise = {
+    _id: string;
+    name: string;
+    muscleGroup?: string;
+    equipment?: string;
+  };
+
   const filteredExercises = useMemo(() => {
     if (!exercises) return [] as Exercise[];
     const searchLower = search.toLowerCase();
@@ -52,12 +62,16 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
   const handleCreate = async () => {
     if (!newExerciseName.trim()) return;
 
-    const id = await createExercise({
-      name: newExerciseName.trim(),
-      muscleGroup: newMuscleGroup || undefined,
-    });
-
-    onSelect(id, newExerciseName.trim());
+    try {
+      const id = await createExercise({
+        name: newExerciseName.trim(),
+        muscleGroup: newMuscleGroup || undefined,
+      });
+      toast.success("Exercise created successfully!");
+      onSelect(id, newExerciseName.trim());
+    } catch (error) {
+      toast.error("Failed to create exercise. Please try again.");
+    }
   };
 
   return (
@@ -108,32 +122,41 @@ export function ExerciseSelector({ onSelect, onClose }: ExerciseSelectorProps) {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {Object.entries(groupedExercises).map(([group, groupExercises]) => (
-                    <div key={group}>
-                      <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-                        {group}
-                      </h3>
-                      <div className="space-y-1">
-                        {groupExercises.map((exercise: Exercise) => (
-                          <button
-                            key={exercise._id}
-                            onClick={() => onSelect(exercise._id as Id<"exercises">, exercise.name)}
-                            className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-card transition-colors text-left group"
-                          >
-                            <div>
-                              <span className="font-medium">{exercise.name}</span>
-                              {exercise.equipment && (
-                                <span className="text-muted-foreground text-sm ml-2">
-                                  ({exercise.equipment})
+                  {Object.entries(groupedExercises).map(
+                    ([group, groupExercises]) => (
+                      <div key={group}>
+                        <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+                          {group}
+                        </h3>
+                        <div className="space-y-1">
+                          {groupExercises.map((exercise: Exercise) => (
+                            <button
+                              key={exercise._id}
+                              onClick={() =>
+                                onSelect(
+                                  exercise._id as Id<"exercises">,
+                                  exercise.name
+                                )
+                              }
+                              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-card transition-colors text-left group"
+                            >
+                              <div>
+                                <span className="font-medium">
+                                  {exercise.name}
                                 </span>
-                              )}
-                            </div>
-                            <Check className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </button>
-                        ))}
+                                {exercise.equipment && (
+                                  <span className="text-muted-foreground text-sm ml-2">
+                                    ({exercise.equipment})
+                                  </span>
+                                )}
+                              </div>
+                              <Check className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  )}
                 </div>
               )}
             </div>

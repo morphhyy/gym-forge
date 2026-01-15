@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { ExerciseSelector } from "@/app/components/exercise-selector";
+import { AIPlanGenerator } from "@/app/components/ai-plan-generator";
 import {
   Plus,
   Trash2,
@@ -14,8 +15,10 @@ import {
   GripVertical,
   Calendar,
   Edit2,
+  Sparkles,
 } from "lucide-react";
 import { getDayName, getShortDayName } from "@/app/lib/utils";
+import { toast } from "sonner";
 
 type PlanExercise = {
   exerciseId: Id<"exercises">;
@@ -33,6 +36,7 @@ type PlanDay = {
 export default function PlanPage() {
   const activePlan = useQuery(api.plans.getActivePlan);
   const allPlans = useQuery(api.plans.getAllPlans);
+  const aiUsage = useQuery(api.users.getAIUsage);
   const createPlan = useMutation(api.plans.createPlan);
   const setActivePlan = useMutation(api.plans.setActivePlan);
   const deletePlanMutation = useMutation(api.plans.deletePlan);
@@ -45,7 +49,10 @@ export default function PlanPage() {
   const [showExerciseSelector, setShowExerciseSelector] = useState<
     number | null
   >(null);
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState<Id<"plans"> | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Seed exercises on first load if needed
   const exercises = useQuery(api.exercises.getAllExercises);
@@ -53,20 +60,55 @@ export default function PlanPage() {
     seedExercises();
   }
 
+  const handleDeletePlan = async (planId: Id<"plans">) => {
+    if (isDeleting) return;
+
+    setIsDeleting(true);
+    try {
+      await deletePlanMutation({ planId });
+      toast.success("Plan deleted successfully");
+      setPlanToDelete(null);
+    } catch (error) {
+      console.error("Failed to delete plan:", error);
+      toast.error("Failed to delete plan. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const initializeFromPlan = useCallback(() => {
     if (activePlan) {
       setPlanName(activePlan.name);
       setDays(
-        activePlan.days.map((day: { weekday: number; name?: string; exercises: { exerciseId: Id<"exercises">; exercise?: { name: string } | null; sets: { repsTarget: number; notes?: string }[] }[] }) => ({
-          weekday: day.weekday,
-          name: day.name,
-          exercises: day.exercises.map((e: { exerciseId: Id<"exercises">; exercise?: { name: string } | null; sets: { repsTarget: number; notes?: string }[] }, idx: number) => ({
-            exerciseId: e.exerciseId,
-            exerciseName: e.exercise?.name ?? "Unknown",
-            order: idx,
-            sets: e.sets,
-          })),
-        }))
+        activePlan.days.map(
+          (day: {
+            weekday: number;
+            name?: string;
+            exercises: {
+              exerciseId: Id<"exercises">;
+              exercise?: { name: string } | null;
+              sets: { repsTarget: number; notes?: string }[];
+            }[];
+          }) => ({
+            weekday: day.weekday,
+            name: day.name,
+            exercises: day.exercises.map(
+              (
+                e: {
+                  exerciseId: Id<"exercises">;
+                  exercise?: { name: string } | null;
+                  sets: { repsTarget: number; notes?: string }[];
+                },
+                idx: number
+              ) => ({
+                exerciseId: e.exerciseId,
+                exerciseName: e.exercise?.name ?? "Unknown",
+                order: idx,
+                sets: e.sets,
+              })
+            ),
+          })
+        )
       );
     }
   }, [activePlan]);
@@ -82,6 +124,39 @@ export default function PlanPage() {
     );
     setIsEditing(true);
     setExpandedDay(0);
+    toast.info("Creating new plan...");
+  };
+
+  const handleAIPlanGenerated = (plan: {
+    planName: string;
+    description: string;
+    days: {
+      weekday: number;
+      name?: string;
+      exercises: {
+        exerciseId: string;
+        exerciseName: string;
+        sets: { repsTarget: number; notes?: string }[];
+      }[];
+    }[];
+  }) => {
+    setPlanName(plan.planName);
+    setDays(
+      plan.days.map((day, idx) => ({
+        weekday: day.weekday,
+        name: day.name,
+        exercises: day.exercises.map((ex, exIdx) => ({
+          exerciseId: ex.exerciseId as Id<"exercises">,
+          exerciseName: ex.exerciseName,
+          order: exIdx,
+          sets: ex.sets,
+        })),
+      }))
+    );
+    setShowAIGenerator(false);
+    setIsEditing(true);
+    setExpandedDay(0);
+    toast.success("AI plan loaded! Review and save when ready.");
   };
 
   const startEditing = () => {
@@ -105,7 +180,11 @@ export default function PlanPage() {
                   exerciseId,
                   exerciseName,
                   order: day.exercises.length,
-                  sets: [{ repsTarget: 8 }, { repsTarget: 8 }, { repsTarget: 8 }],
+                  sets: [
+                    { repsTarget: 8 },
+                    { repsTarget: 8 },
+                    { repsTarget: 8 },
+                  ],
                 },
               ],
             }
@@ -159,6 +238,7 @@ export default function PlanPage() {
 
   const savePlan = async () => {
     setIsSaving(true);
+    const toastId = toast.loading("Saving plan...");
     try {
       await createPlan({
         name: planName,
@@ -172,9 +252,11 @@ export default function PlanPage() {
           })),
         })),
       });
+      toast.success("Plan saved successfully!", { id: toastId });
       setIsEditing(false);
     } catch (error) {
       console.error("Failed to save plan:", error);
+      toast.error("Failed to save plan. Please try again.", { id: toastId });
     } finally {
       setIsSaving(false);
     }
@@ -212,11 +294,34 @@ export default function PlanPage() {
               Create your first workout plan to organize your training week and
               track progress.
             </p>
-            <button onClick={startNewPlan} className="btn btn-primary">
-              <Plus className="w-4 h-4" />
-              Create Plan
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button onClick={startNewPlan} className="btn btn-secondary">
+                <Plus className="w-4 h-4" />
+                Create Manually
+              </button>
+              <button
+                onClick={() => setShowAIGenerator(true)}
+                disabled={aiUsage?.isLimitReached}
+                className="btn btn-primary bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed relative"
+              >
+                <Sparkles className="w-4 h-4" />
+                Generate with AI
+                {aiUsage && !aiUsage.isLimitReached && (
+                  <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                    {aiUsage.remaining} left
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
+
+          {/* AI Plan Generator Modal */}
+          {showAIGenerator && (
+            <AIPlanGenerator
+              onPlanGenerated={handleAIPlanGenerated}
+              onClose={() => setShowAIGenerator(false)}
+            />
+          )}
         </div>
       );
     }
@@ -238,56 +343,85 @@ export default function PlanPage() {
               <Edit2 className="w-4 h-4" />
               Edit
             </button>
-            <button onClick={startNewPlan} className="btn btn-primary">
+            <button onClick={startNewPlan} className="btn btn-secondary">
               <Plus className="w-4 h-4" />
               New Plan
+            </button>
+            <button
+              onClick={() => setShowAIGenerator(true)}
+              disabled={aiUsage?.isLimitReached}
+              className="btn btn-primary from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed relative"
+            >
+              <Sparkles className="w-4 h-4" />
+              AI Generate
             </button>
           </div>
         </div>
 
         {/* Day Cards */}
         <div className="grid gap-4 md:grid-cols-2">
-          {activePlan.days.map((day: { _id: string; weekday: number; name?: string; exercises: { _id: string; exercise?: { name: string } | null; sets: { repsTarget: number }[] }[] }) => (
-            <div
-              key={day._id}
-              className={`card ${
-                day.exercises.length === 0 ? "opacity-60" : ""
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold">{getDayName(day.weekday)}</h3>
-                  {day.name && (
-                    <p className="text-sm text-primary">{day.name}</p>
-                  )}
+          {activePlan.days.map(
+            (day: {
+              _id: string;
+              weekday: number;
+              name?: string;
+              exercises: {
+                _id: string;
+                exercise?: { name: string } | null;
+                sets: { repsTarget: number }[];
+              }[];
+            }) => (
+              <div
+                key={day._id}
+                className={`card ${
+                  day.exercises.length === 0 ? "opacity-60" : ""
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="font-semibold">{getDayName(day.weekday)}</h3>
+                    {day.name && (
+                      <p className="text-sm text-primary">{day.name}</p>
+                    )}
+                  </div>
+                  <span className="badge badge-secondary">
+                    {day.exercises.length} exercise
+                    {day.exercises.length !== 1 ? "s" : ""}
+                  </span>
                 </div>
-                <span className="badge badge-secondary">
-                  {day.exercises.length} exercise
-                  {day.exercises.length !== 1 ? "s" : ""}
-                </span>
-              </div>
 
                 {day.exercises.length > 0 ? (
                   <div className="space-y-2">
-                    {day.exercises.map((exercise: { _id: string; exercise?: { name: string } | null; sets: { repsTarget: number }[] }, idx: number) => (
-                    <div
-                      key={exercise._id}
-                      className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0"
-                    >
-                      <span className="text-sm">
-                        {exercise.exercise?.name ?? "Unknown"}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {exercise.sets.length}×{exercise.sets[0]?.repsTarget}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Rest Day</p>
-              )}
-            </div>
-          ))}
+                    {day.exercises.map(
+                      (
+                        exercise: {
+                          _id: string;
+                          exercise?: { name: string } | null;
+                          sets: { repsTarget: number }[];
+                        },
+                        idx: number
+                      ) => (
+                        <div
+                          key={exercise._id}
+                          className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0"
+                        >
+                          <span className="text-sm">
+                            {exercise.exercise?.name ?? "Unknown"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {exercise.sets.length}×
+                            {exercise.sets[0]?.repsTarget}
+                          </span>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Rest Day</p>
+                )}
+              </div>
+            )
+          )}
         </div>
 
         {/* Plan History */}
@@ -296,34 +430,119 @@ export default function PlanPage() {
             <h3 className="font-semibold mb-4">Plan History</h3>
             <div className="space-y-2">
               {allPlans
-                .sort((a: { planVersion: number }, b: { planVersion: number }) => b.planVersion - a.planVersion)
-                .map((plan: { _id: Id<"plans">; name: string; planVersion: number; active: boolean }) => (
-                  <div
-                    key={plan._id}
-                    className="flex items-center justify-between py-2 border-b border-border/50 last:border-0"
-                  >
-                    <div>
-                      <span className="font-medium">{plan.name}</span>
-                      <span className="text-sm text-muted-foreground ml-2">
-                        v{plan.planVersion}
-                      </span>
+                .sort(
+                  (a: { planVersion: number }, b: { planVersion: number }) =>
+                    b.planVersion - a.planVersion
+                )
+                .map(
+                  (plan: {
+                    _id: Id<"plans">;
+                    name: string;
+                    planVersion: number;
+                    active: boolean;
+                  }) => (
+                    <div
+                      key={plan._id}
+                      className="flex items-center justify-between py-2 border-b border-border/50 last:border-0"
+                    >
+                      <div>
+                        <span className="font-medium">{plan.name}</span>
+                        <span className="text-sm text-muted-foreground ml-2">
+                          v{plan.planVersion}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {plan.active ? (
+                          <span className="badge">Active</span>
+                        ) : (
+                          <>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await setActivePlan({ planId: plan._id });
+                                  toast.success("Plan activated!");
+                                } catch (error) {
+                                  toast.error("Failed to activate plan");
+                                }
+                              }}
+                              className="btn btn-ghost text-xs px-3 py-1"
+                            >
+                              Activate
+                            </button>
+                            <button
+                              onClick={() => setPlanToDelete(plan._id)}
+                              className="btn btn-ghost text-xs px-2 py-1 text-danger hover:text-danger hover:bg-danger/10"
+                              title="Delete plan"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {plan.active ? (
-                        <span className="badge">Active</span>
-                      ) : (
-                        <button
-                          onClick={() => setActivePlan({ planId: plan._id })}
-                          className="btn btn-ghost text-xs px-3 py-1"
-                        >
-                          Activate
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  )
+                )}
             </div>
           </div>
+        )}
+
+        {/* Delete Confirmation Dialog */}
+        {planToDelete && (
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="card w-full max-w-md animate-fadeIn">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-danger/20 rounded-full flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-danger" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Delete Plan</h3>
+                  <p className="text-sm text-muted-foreground">
+                    This action cannot be undone
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-sm mb-6">
+                Are you sure you want to delete this workout plan? All
+                associated data will be permanently removed.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setPlanToDelete(null)}
+                  disabled={isDeleting}
+                  className="btn btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeletePlan(planToDelete)}
+                  disabled={isDeleting}
+                  className="btn btn-danger flex-1"
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* AI Plan Generator Modal */}
+        {showAIGenerator && (
+          <AIPlanGenerator
+            onPlanGenerated={handleAIPlanGenerated}
+            onClose={() => setShowAIGenerator(false)}
+          />
         )}
       </div>
     );
@@ -464,9 +683,7 @@ export default function PlanPage() {
                               </span>
                             </div>
                             <button
-                              onClick={() =>
-                                removeExercise(dayIndex, exIndex)
-                              }
+                              onClick={() => removeExercise(dayIndex, exIndex)}
                               className="btn btn-ghost p-1 text-muted hover:text-danger"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -492,8 +709,7 @@ export default function PlanPage() {
                                     const newSets = [...exercise.sets];
                                     newSets[setIndex] = {
                                       ...newSets[setIndex],
-                                      repsTarget:
-                                        parseInt(e.target.value) || 8,
+                                      repsTarget: parseInt(e.target.value) || 8,
                                     };
                                     updateExerciseSets(
                                       dayIndex,
@@ -516,11 +732,7 @@ export default function PlanPage() {
                                   ...exercise.sets,
                                   { repsTarget: 8 },
                                 ];
-                                updateExerciseSets(
-                                  dayIndex,
-                                  exIndex,
-                                  newSets
-                                );
+                                updateExerciseSets(dayIndex, exIndex, newSets);
                               }}
                               className="btn btn-ghost p-1"
                             >
