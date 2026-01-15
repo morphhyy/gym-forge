@@ -119,7 +119,9 @@ export default function LandingPage() {
               <div className="w-12 h-12 bg-primary-muted rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <Dumbbell className="w-6 h-6 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Set-by-Set Tracking</h3>
+              <h3 className="text-xl font-semibold mb-2">
+                Set-by-Set Tracking
+              </h3>
               <p className="text-muted-foreground">
                 Log every set with weight and reps. Pre-filled from your last
                 workout so you can focus on lifting.

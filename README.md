@@ -31,12 +31,14 @@ A modern workout tracking application built with Next.js, Clerk authentication, 
 ### Installation
 
 1. Clone the repository:
+
    ```bash
    git clone <repo-url>
    cd gym-plan
    ```
 
 2. Install dependencies:
+
    ```bash
    npm install
    ```
@@ -50,6 +52,7 @@ A modern workout tracking application built with Next.js, Clerk authentication, 
    - This will generate your Convex URL
 
 5. Create a `.env.local` file with your credentials:
+
    ```env
    # Clerk
    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...

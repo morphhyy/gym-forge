@@ -16,6 +16,7 @@ import {
   Flame,
 } from "lucide-react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 type SetLog = {
   exerciseId: Id<"exercises">;
@@ -171,13 +172,15 @@ export default function LogPage() {
 
         {/* Date Selector */}
         <div className="flex items-center gap-2 bg-card rounded-lg p-1">
-          <button
+          <Button
+            size="icon"
+            variant="ghost"
             onClick={() => handleDateChange("prev")}
             className="btn btn-ghost p-2"
           >
             <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div className="px-4 py-2 text-center min-w-[160px]">
+          </Button>
+          <div className="px-2 py-1 text-center min-w-[100px]">
             <p className="font-semibold">
               {isToday ? "Today" : format(new Date(selectedDate), "EEE, MMM d")}
             </p>
@@ -185,13 +188,15 @@ export default function LogPage() {
               {format(new Date(selectedDate), "yyyy")}
             </p>
           </div>
-          <button
+          <Button
+            size="icon"
+            variant="ghost"
             onClick={() => handleDateChange("next")}
             className="btn btn-ghost p-2"
             disabled={isToday}
           >
             <ChevronRight className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
       </div>
 

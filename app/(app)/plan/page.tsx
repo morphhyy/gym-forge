@@ -124,7 +124,6 @@ export default function PlanPage() {
     );
     setIsEditing(true);
     setExpandedDay(0);
-    toast.info("Creating new plan...");
   };
 
   const handleAIPlanGenerated = (plan: {
@@ -302,26 +301,20 @@ export default function PlanPage() {
               <button
                 onClick={() => setShowAIGenerator(true)}
                 disabled={aiUsage?.isLimitReached}
-                className="btn btn-primary bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed relative"
+                className="btn btn-ai"
               >
                 <Sparkles className="w-4 h-4" />
                 Generate with AI
-                {aiUsage && !aiUsage.isLimitReached && (
-                  <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                    {aiUsage.remaining} left
-                  </span>
-                )}
               </button>
             </div>
           </div>
 
           {/* AI Plan Generator Modal */}
-          {showAIGenerator && (
-            <AIPlanGenerator
-              onPlanGenerated={handleAIPlanGenerated}
-              onClose={() => setShowAIGenerator(false)}
-            />
-          )}
+          <AIPlanGenerator
+            open={showAIGenerator}
+            onOpenChange={setShowAIGenerator}
+            onPlanGenerated={handleAIPlanGenerated}
+          />
         </div>
       );
     }
@@ -350,7 +343,7 @@ export default function PlanPage() {
             <button
               onClick={() => setShowAIGenerator(true)}
               disabled={aiUsage?.isLimitReached}
-              className="btn btn-primary from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed relative"
+              className="btn btn-ai"
             >
               <Sparkles className="w-4 h-4" />
               AI Generate
@@ -538,12 +531,11 @@ export default function PlanPage() {
         )}
 
         {/* AI Plan Generator Modal */}
-        {showAIGenerator && (
-          <AIPlanGenerator
-            onPlanGenerated={handleAIPlanGenerated}
-            onClose={() => setShowAIGenerator(false)}
-          />
-        )}
+        <AIPlanGenerator
+          open={showAIGenerator}
+          onOpenChange={setShowAIGenerator}
+          onPlanGenerated={handleAIPlanGenerated}
+        />
       </div>
     );
   }
@@ -766,12 +758,15 @@ export default function PlanPage() {
       </div>
 
       {/* Exercise Selector Modal */}
-      {showExerciseSelector !== null && (
-        <ExerciseSelector
-          onSelect={(id, name) => addExercise(showExerciseSelector, id, name)}
-          onClose={() => setShowExerciseSelector(null)}
-        />
-      )}
+      <ExerciseSelector
+        open={showExerciseSelector !== null}
+        onOpenChange={(open) => !open && setShowExerciseSelector(null)}
+        onSelect={(id, name) => {
+          if (showExerciseSelector !== null) {
+            addExercise(showExerciseSelector, id, name);
+          }
+        }}
+      />
     </div>
   );
 }

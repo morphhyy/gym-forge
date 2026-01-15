@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAuth } from "./auth";
 
-const MAX_FREE_AI_USES = 3;
+const MAX_FREE_AI_USES = 2;
 
 // Get current user's profile
 export const getCurrentUser = query({
@@ -27,7 +27,7 @@ export const upsertProfile = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
     const identity = await ctx.auth.getUserIdentity();
-    
+
     const existingUser = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
@@ -60,7 +60,7 @@ export const ensureUser = mutation({
   handler: async (ctx) => {
     const userId = await requireAuth(ctx);
     const identity = await ctx.auth.getUserIdentity();
-    
+
     const existingUser = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
@@ -75,7 +75,7 @@ export const ensureUser = mutation({
         createdAt: Date.now(),
       });
     }
-    
+
     return existingUser._id;
   },
 });
@@ -85,7 +85,7 @@ export const incrementAIUsage = mutation({
   args: {},
   handler: async (ctx) => {
     const userId = await requireAuth(ctx);
-    
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
@@ -109,14 +109,18 @@ export const getAIUsage = query({
   args: {},
   handler: async (ctx) => {
     const userId = await requireAuth(ctx);
-    
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
       .unique();
 
     if (!user) {
-      return { usageCount: 0, remaining: MAX_FREE_AI_USES, limit: MAX_FREE_AI_USES };
+      return {
+        usageCount: 0,
+        remaining: MAX_FREE_AI_USES,
+        limit: MAX_FREE_AI_USES,
+      };
     }
 
     const usageCount = user.aiUsageCount ?? 0;

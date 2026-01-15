@@ -102,8 +102,8 @@ export default function DashboardPage() {
         {/* Plan Card */}
         <Link href="/plan" className="card card-hover group">
           <div className="flex items-start justify-between mb-4">
-            <div className="w-12 h-12 bg-secondary/20 rounded-xl flex items-center justify-center">
-              <Calendar className="w-6 h-6 text-secondary" />
+            <div className="w-12 h-12 bg-amber-500/15 rounded-xl flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-amber-500" />
             </div>
             <ChevronRight className="w-5 h-5 text-muted group-hover:text-foreground transition-colors" />
           </div>
@@ -122,8 +122,8 @@ export default function DashboardPage() {
         {/* Progress Card */}
         <Link href="/progress" className="card card-hover group">
           <div className="flex items-start justify-between mb-4">
-            <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center">
-              <LineChart className="w-6 h-6 text-accent" />
+            <div className="w-12 h-12 bg-blue-500/15 rounded-xl flex items-center justify-center">
+              <LineChart className="w-6 h-6 text-blue-500" />
             </div>
             <ChevronRight className="w-5 h-5 text-muted group-hover:text-foreground transition-colors" />
           </div>

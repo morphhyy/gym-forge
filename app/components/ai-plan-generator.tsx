@@ -2,19 +2,26 @@
 
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@clerk/nextjs";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import {
   AlertCircle,
   Check,
   Loader2,
   RefreshCw,
   Sparkles,
-  X,
   Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { getDayName } from "@/app/lib/utils";
-import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 interface GeneratedPlan {
   planName: string;
@@ -31,8 +38,9 @@ interface GeneratedPlan {
 }
 
 interface AIPlanGeneratorProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onPlanGenerated: (plan: GeneratedPlan) => void;
-  onClose: () => void;
 }
 
 const promptSuggestions = [
@@ -63,8 +71,9 @@ const promptSuggestions = [
 ];
 
 export function AIPlanGenerator({
+  open,
+  onOpenChange,
   onPlanGenerated,
-  onClose,
 }: AIPlanGeneratorProps) {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -75,7 +84,6 @@ export function AIPlanGenerator({
 
   const { userId } = useAuth();
   const generatePlan = useAction(api.ai.generateWorkoutPlan);
-  const incrementAIUsage = useMutation(api.users.incrementAIUsage);
   const aiUsage = useQuery(api.users.getAIUsage);
 
   const handleGenerate = async () => {
@@ -87,12 +95,10 @@ export function AIPlanGenerator({
     try {
       const plan = await generatePlan({ prompt: prompt.trim(), userId });
       setGeneratedPlan(plan as GeneratedPlan);
-      toast.success("Plan generated successfully!");
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to generate plan";
       setError(errorMessage);
-      toast.error(errorMessage);
     } finally {
       setIsGenerating(false);
     }
@@ -102,69 +108,65 @@ export function AIPlanGenerator({
     await handleGenerate();
   };
 
-  const handleApprove = async () => {
+  const handleApprove = () => {
     if (!generatedPlan) return;
-
-    // Increment usage count when user approves
-    try {
-      await incrementAIUsage();
-      toast.success("Plan approved and saved!");
-      onPlanGenerated(generatedPlan);
-    } catch (err) {
-      console.error("Failed to increment usage:", err);
-      toast.warning("Plan saved but usage count may not have updated");
-      // Still proceed with plan generation even if usage increment fails
-      onPlanGenerated(generatedPlan);
-    }
+    // Usage is already incremented server-side during generation
+    onPlanGenerated(generatedPlan);
+    onOpenChange(false);
+    resetState();
   };
 
   const handleSuggestionClick = (suggestionPrompt: string) => {
     setPrompt(suggestionPrompt);
   };
 
+  const resetState = () => {
+    setPrompt("");
+    setGeneratedPlan(null);
+    setError(null);
+  };
+
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="card w-full max-w-2xl max-h-[90vh] flex flex-col animate-fadeIn">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-border">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-linear-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">AI Plan Generator</h2>
-              <p className="text-sm text-muted-foreground">
+              <DialogTitle>AI Plan Generator</DialogTitle>
+              <DialogDescription>
                 Describe your goals and let AI create your plan
-              </p>
+              </DialogDescription>
             </div>
           </div>
-          <button onClick={onClose} className="btn btn-ghost p-2">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        </DialogHeader>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto space-y-4">
           {/* Usage Info */}
           {aiUsage && (
             <div
               className={`p-4 rounded-lg border ${
                 aiUsage.isLimitReached
-                  ? "bg-danger-muted border-danger/30"
-                  : "bg-primary-muted border-primary/30"
+                  ? "bg-destructive/10 border-destructive/30"
+                  : "bg-primary/10 border-primary/30"
               }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {aiUsage.isLimitReached ? (
-                    <AlertCircle className="w-5 h-5 text-danger" />
+                    <AlertCircle className="w-5 h-5 text-destructive" />
                   ) : (
                     <Sparkles className="w-5 h-5 text-primary" />
                   )}
                   <div>
                     <p
                       className={`text-sm font-medium ${
-                        aiUsage.isLimitReached ? "text-danger" : "text-primary"
+                        aiUsage.isLimitReached
+                          ? "text-destructive"
+                          : "text-primary"
                       }`}
                     >
                       {aiUsage.isLimitReached
@@ -185,7 +187,7 @@ export function AIPlanGenerator({
 
           {/* Limit Reached Message */}
           {aiUsage?.isLimitReached && (
-            <div className="p-4 rounded-lg bg-card border border-border">
+            <div className="p-4 rounded-lg bg-card border">
               <p className="text-sm text-muted-foreground">
                 You&apos;ve reached the free limit of {aiUsage.limit}{" "}
                 AI-generated plans. You can still create workout plans manually
@@ -206,7 +208,7 @@ export function AIPlanGenerator({
                     key={suggestion.title}
                     onClick={() => handleSuggestionClick(suggestion.prompt)}
                     disabled={isGenerating}
-                    className="text-left p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-card transition-colors disabled:opacity-50"
+                    className="text-left p-3 rounded-lg border hover:border-primary/50 hover:bg-accent transition-colors disabled:opacity-50"
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span>{suggestion.icon}</span>
@@ -226,13 +228,12 @@ export function AIPlanGenerator({
               <label className="block text-sm font-medium mb-2">
                 Describe your ideal workout plan
               </label>
-              <textarea
+              <Textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="e.g., I'm an intermediate lifter looking to build muscle. I can train 5 days a week and want to focus on upper body while maintaining legs. I prefer compound movements and have about 60 minutes per session."
                 rows={5}
                 disabled={isGenerating}
-                className="input resize-none"
               />
               <p className="text-xs text-muted-foreground mt-2">
                 Include details like: experience level, days available, goals,
@@ -243,7 +244,7 @@ export function AIPlanGenerator({
 
           {/* Error Message */}
           {error && (
-            <div className="p-4 rounded-lg bg-danger-muted border border-danger/30 text-danger text-sm">
+            <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm">
               {error}
             </div>
           )}
@@ -266,7 +267,7 @@ export function AIPlanGenerator({
           {/* Generated Plan Preview */}
           {generatedPlan && !isGenerating && (
             <div className="space-y-4">
-              <div className="p-4 rounded-lg bg-primary-muted border border-primary/30">
+              <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
                 <h3 className="font-semibold text-lg mb-2">
                   {generatedPlan.planName}
                 </h3>
@@ -281,7 +282,7 @@ export function AIPlanGenerator({
                   {generatedPlan.days.map((day) => (
                     <div
                       key={day.weekday}
-                      className="p-3 rounded-lg border border-border bg-card"
+                      className="p-3 rounded-lg border bg-card"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div>
@@ -327,7 +328,7 @@ export function AIPlanGenerator({
                 </div>
               </div>
 
-              <div className="p-3 rounded-lg bg-muted border border-border">
+              <div className="p-3 rounded-lg bg-muted border">
                 <p className="text-xs text-muted-foreground">
                   Review the plan above. You can regenerate if you&apos;d like
                   changes, or approve to use this plan. Usage count only
@@ -339,23 +340,25 @@ export function AIPlanGenerator({
         </div>
 
         {/* Footer */}
-        <div className="pt-4 border-t border-border flex gap-3">
+        <div className="pt-4 border-t flex gap-3">
           {generatedPlan ? (
             <>
-              <button
+              <Button
                 onClick={() => {
                   setGeneratedPlan(null);
                   setError(null);
                 }}
                 disabled={isGenerating}
-                className="btn btn-secondary flex-1"
+                variant="secondary"
+                className="flex-1"
               >
                 Back
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleRegenerate}
                 disabled={isGenerating || aiUsage?.isLimitReached}
-                className="btn btn-secondary flex-1"
+                variant="secondary"
+                className="flex-1"
               >
                 {isGenerating ? (
                   <>
@@ -368,31 +371,32 @@ export function AIPlanGenerator({
                     Regenerate
                   </>
                 )}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleApprove}
                 disabled={isGenerating}
-                className="btn btn-primary flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                className="flex-1 btn-ai"
               >
                 <Check className="w-4 h-4" />
                 Approve Plan
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
-                onClick={onClose}
+              <Button
+                onClick={() => onOpenChange(false)}
                 disabled={isGenerating}
-                className="btn btn-secondary flex-1"
+                variant="secondary"
+                className="flex-1"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleGenerate}
                 disabled={
                   !prompt.trim() || isGenerating || aiUsage?.isLimitReached
                 }
-                className="btn btn-primary flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 btn-ai"
               >
                 {isGenerating ? (
                   <>
@@ -405,11 +409,11 @@ export function AIPlanGenerator({
                     Generate Plan
                   </>
                 )}
-              </button>
+              </Button>
             </>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

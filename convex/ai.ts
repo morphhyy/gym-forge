@@ -7,7 +7,7 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
-const MAX_FREE_AI_USES = 3;
+const MAX_FREE_AI_USES = 2;
 
 // Define Zod schemas for structured output
 const ExerciseSchema = z.object({
@@ -71,7 +71,7 @@ export const generateWorkoutPlan = action({
       );
     }
 
-    // Check AI usage limit (but don't increment yet - only increment on approval)
+    // Check AI usage limit (increment happens when plan is saved, not generated)
     const user = await ctx.runQuery(api.users.getCurrentUser);
     if (!user) {
       throw new Error("User not found");
@@ -93,26 +93,46 @@ export const generateWorkoutPlan = action({
       )
       .join(", ");
 
-    const systemPrompt = `You are a professional fitness coach and workout plan designer. Create personalized weekly workout plans based on user requirements.
+    const systemPrompt = `You are an elite strength and conditioning coach with 20+ years of experience training athletes and bodybuilders. Create scientifically-backed, personalized weekly workout plans.
 
-Available exercises in our database: ${exerciseNames}
+AVAILABLE EXERCISES (YOU MUST ONLY USE THESE EXACT NAMES):
+${exerciseNames}
 
-IMPORTANT: You MUST only use exercises from the list above. Do not suggest exercises that are not in the list.
+CRITICAL RULES:
+1. ONLY use exercise names EXACTLY as listed above - no variations or alternatives
+2. weekday: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
+3. Include ALL 7 days (0-6) in your response
+4. Rest days = empty exercises array with label "Rest Day"
 
-When creating a plan, consider:
-- User's fitness goals (strength, muscle building, fat loss, etc.)
-- Experience level (beginner, intermediate, advanced)
-- Available days for training
-- Muscle group balance and recovery time
-- Progressive overload principles
+PROGRAM DESIGN PRINCIPLES:
+- Compound movements first (squats, deadlifts, bench, rows, overhead press)
+- Isolation exercises after compounds
+- 48-72 hours between training same muscle group
+- Balance push/pull ratios to prevent imbalances
+- Include both horizontal and vertical push/pull movements
 
-Rules:
-- weekday 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-- Include all 7 days (0-6)
-- Rest days should have empty exercises array
-- Use exact exercise names from the provided list
-- Sets should be between 2-5
-- Reps should be between 5-15 for strength, 8-12 for hypertrophy, 12-20 for endurance`;
+VOLUME GUIDELINES BY GOAL:
+• Strength: 3-5 sets × 3-6 reps, compound-focused, longer rest
+• Hypertrophy: 3-4 sets × 8-12 reps, mix of compound and isolation
+• Endurance: 2-3 sets × 15-20 reps, shorter rest periods
+• Beginner: 2-3 sets × 10-12 reps, full body 3x/week
+• Intermediate: 3-4 sets × 8-12 reps, upper/lower or PPL split
+• Advanced: 4-5 sets × 6-12 reps, specialized splits
+
+SPLIT RECOMMENDATIONS:
+- 2-3 days: Full Body each session
+- 4 days: Upper/Lower split (2 upper, 2 lower)
+- 5-6 days: Push/Pull/Legs (PPL) or Arnold split
+- Include at least 1-2 rest days per week
+
+EXERCISE ORDER (per session):
+1. Power/Olympic lifts (if applicable)
+2. Main compound lifts (squat, bench, deadlift variations)
+3. Secondary compounds (rows, presses, lunges)
+4. Isolation exercises (curls, extensions, raises)
+5. Core/abs work (optional, at end)
+
+Create a balanced, effective program that matches the user's goals, experience, and available training days.`;
 
     // Initialize OpenAI client
     const openai = new OpenAI({
@@ -168,9 +188,6 @@ Rules:
         })
         .filter((ex): ex is NonNullable<typeof ex> => ex !== null),
     }));
-
-    // Note: Usage count is incremented when user approves the plan, not on generation
-    // This allows users to regenerate without consuming their limit
 
     return {
       planName: plan.planName || "AI Generated Plan",

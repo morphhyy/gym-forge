@@ -102,7 +102,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
             <Dumbbell className="w-6 h-6 text-background" />
           </div>
-          <span className="text-xl font-bold tracking-tight">GymForge</span>
+          <Link href="/dashboard" className="text-xl font-bold tracking-tight">
+            GymForge
+          </Link>
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-1">
