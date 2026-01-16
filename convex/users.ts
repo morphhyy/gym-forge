@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAuth } from "./auth";
 
-const MAX_FREE_AI_USES = 2;
+const MAX_FREE_AI_USES = 1;
 
 // Get current user's profile
 export const getCurrentUser = query({
