@@ -44,10 +44,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
 
-        {/* PWA & Favicon icons */}
+        
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/dumbbell192.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/dumbbell192.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icon-16x16.png" />
 
       </head>
       <body className="antialiased min-h-screen bg-background text-foreground">
