@@ -33,6 +33,7 @@ export default defineSchema({
     name: v.string(),
     active: v.boolean(),
     createdAt: v.number(),
+    planVersion: v.optional(v.number()),
     // Sharing fields
     shareToken: v.optional(v.string()),
     sharedAt: v.optional(v.number()),
