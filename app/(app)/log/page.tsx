@@ -41,7 +41,7 @@ export default function LogPage() {
   });
   const userData = useQuery(api.users.getCurrentUser);
 
-  const weightUnit = userData?.units || "lb";
+  const weightUnit = userData?.units || "kg";
 
   const getOrCreateSession = useMutation(api.sessions.getOrCreateSession);
   const logSet = useMutation(api.sessions.logSet);

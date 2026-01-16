@@ -27,7 +27,7 @@ export default function ProgressPage() {
   const exerciseStats = useQuery(api.progress.getAllExerciseStats);
   const userData = useQuery(api.users.getCurrentUser);
 
-  const weightUnit = userData?.units || "lb";
+  const weightUnit = userData?.units || "kg";
   const isLoading = weeklyStats === undefined || exerciseStats === undefined;
 
   if (isLoading) {

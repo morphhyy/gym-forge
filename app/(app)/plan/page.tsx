@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { ExerciseSelector } from "@/app/components/exercise-selector";
 import { AIPlanGenerator } from "@/app/components/ai-plan-generator";
+import { SharePlanDialog } from "@/app/components/share-plan-dialog";
 import {
   Plus,
   Trash2,
@@ -16,6 +17,7 @@ import {
   Calendar,
   Edit2,
   Sparkles,
+  Share2,
 } from "lucide-react";
 import { getDayName, getShortDayName } from "@/app/lib/utils";
 import { toast } from "sonner";
@@ -38,6 +40,7 @@ export default function PlanPage() {
   const allPlans = useQuery(api.plans.getAllPlans);
   const aiUsage = useQuery(api.users.getAIUsage);
   const createPlan = useMutation(api.plans.createPlan);
+  const updatePlanMutation = useMutation(api.plans.updatePlan);
   const setActivePlan = useMutation(api.plans.setActivePlan);
   const deletePlanMutation = useMutation(api.plans.deletePlan);
   const seedExercises = useMutation(api.exercises.seedExercises);
@@ -50,10 +53,12 @@ export default function PlanPage() {
     number | null
   >(null);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<Id<"plans"> | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAIGenerated, setIsAIGenerated] = useState(false);
+  const [editingPlanId, setEditingPlanId] = useState<Id<"plans"> | null>(null);
 
   // Seed exercises on first load if needed
   const exercises = useQuery(api.exercises.getAllExercises);
@@ -126,6 +131,7 @@ export default function PlanPage() {
     setIsEditing(true);
     setExpandedDay(0);
     setIsAIGenerated(false);
+    setEditingPlanId(null);
   };
 
   const handleAIPlanGenerated = (plan: {
@@ -158,12 +164,14 @@ export default function PlanPage() {
     setIsEditing(true);
     setExpandedDay(0);
     setIsAIGenerated(true);
+    setEditingPlanId(null);
   };
 
   const startEditing = () => {
     initializeFromPlan();
     setIsEditing(true);
     setIsAIGenerated(false);
+    setEditingPlanId(activePlan?._id ?? null);
   };
 
   const addExercise = (
@@ -242,9 +250,8 @@ export default function PlanPage() {
     setIsSaving(true);
     const toastId = toast.loading("Saving plan...");
     try {
-      await createPlan({
+      const planData = {
         name: planName,
-        isAIGenerated,
         days: days.map((day) => ({
           weekday: day.weekday,
           name: day.name,
@@ -254,10 +261,26 @@ export default function PlanPage() {
             sets: e.sets,
           })),
         })),
-      });
-      toast.success("Plan saved successfully!", { id: toastId });
+      };
+
+      if (editingPlanId) {
+        // Update existing plan
+        await updatePlanMutation({
+          planId: editingPlanId,
+          ...planData,
+        });
+        toast.success("Plan updated successfully!", { id: toastId });
+      } else {
+        // Create new plan
+        await createPlan({
+          ...planData,
+          isAIGenerated,
+        });
+        toast.success("Plan created successfully!", { id: toastId });
+      }
       setIsEditing(false);
       setIsAIGenerated(false);
+      setEditingPlanId(null);
     } catch (error) {
       console.error("Failed to save plan:", error);
       toast.error("Failed to save plan. Please try again.", { id: toastId });
@@ -332,18 +355,30 @@ export default function PlanPage() {
               {activePlan.name}
             </h1>
             <p className="text-muted-foreground mt-1">
-              Version {activePlan.planVersion} • Created{" "}
-              {new Date(activePlan.createdAt).toLocaleDateString()}
+              Created {new Date(activePlan.createdAt).toLocaleDateString()}
             </p>
           </div>
-          <div className="grid grid-cols-3 sm:flex gap-2 sm:gap-3 w-full sm:w-auto">
-            <button onClick={startEditing} className="btn btn-secondary text-sm sm:text-base">
+          <div className="grid grid-cols-4 sm:flex gap-2 sm:gap-3 w-full sm:w-auto">
+            <button
+              onClick={startEditing}
+              className="btn btn-secondary text-sm sm:text-base"
+            >
               <Edit2 className="w-4 h-4" />
               <span className="hidden sm:inline">Edit</span>
             </button>
-            <button onClick={startNewPlan} className="btn btn-secondary text-sm sm:text-base">
+            <button
+              onClick={startNewPlan}
+              className="btn btn-secondary text-sm sm:text-base"
+            >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">New</span>
+            </button>
+            <button
+              onClick={() => setShowShareDialog(true)}
+              className="btn btn-secondary text-sm sm:text-base"
+            >
+              <Share2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Share</span>
             </button>
             <button
               onClick={() => setShowAIGenerator(true)}
@@ -429,26 +464,21 @@ export default function PlanPage() {
             <div className="space-y-2">
               {allPlans
                 .sort(
-                  (a: { planVersion: number }, b: { planVersion: number }) =>
-                    b.planVersion - a.planVersion
+                  (a: { createdAt: number }, b: { createdAt: number }) =>
+                    b.createdAt - a.createdAt
                 )
                 .map(
                   (plan: {
                     _id: Id<"plans">;
                     name: string;
-                    planVersion: number;
+                    createdAt: number;
                     active: boolean;
                   }) => (
                     <div
                       key={plan._id}
                       className="flex items-center justify-between py-2 border-b border-border/50 last:border-0"
                     >
-                      <div>
-                        <span className="font-medium">{plan.name}</span>
-                        <span className="text-sm text-muted-foreground ml-2">
-                          v{plan.planVersion}
-                        </span>
-                      </div>
+                      <div className="font-medium">{plan.name}</div>
                       <div className="flex items-center gap-2">
                         {plan.active ? (
                           <span className="badge">Active</span>
@@ -541,6 +571,17 @@ export default function PlanPage() {
           onOpenChange={setShowAIGenerator}
           onPlanGenerated={handleAIPlanGenerated}
         />
+
+        {/* Share Plan Dialog */}
+        {activePlan && (
+          <SharePlanDialog
+            open={showShareDialog}
+            onOpenChange={setShowShareDialog}
+            planId={activePlan._id}
+            planName={activePlan.name}
+            existingToken={activePlan.shareToken}
+          />
+        )}
       </div>
     );
   }
@@ -728,7 +769,11 @@ export default function PlanPage() {
                                     ...exercise.sets,
                                     { repsTarget: 8 },
                                   ];
-                                  updateExerciseSets(dayIndex, exIndex, newSets);
+                                  updateExerciseSets(
+                                    dayIndex,
+                                    exIndex,
+                                    newSets
+                                  );
                                 }}
                                 className="btn btn-secondary text-xs py-1.5 px-3"
                               >

@@ -41,7 +41,7 @@ export default function ExerciseProgressPage() {
   const exercises = useQuery(api.exercises.getAllExercises);
   const userData = useQuery(api.users.getCurrentUser);
 
-  const weightUnit = userData?.units || "lb";
+  const weightUnit = userData?.units || "kg";
   const exercise = exercises?.find((e: { _id: string }) => e._id === exerciseId);
 
   const isLoading =
@@ -99,8 +99,8 @@ export default function ExerciseProgressPage() {
           <p className="font-medium mb-2">{data.fullDate}</p>
           <div className="space-y-1 text-sm">
             <p className="text-primary">Top Set: {data.topSet} {weightUnit} × {data.reps}</p>
-            <p className="text-secondary">Volume: {data.volume}k {weightUnit}</p>
-            <p className="text-accent">Est. 1RM: {data.e1RM} {weightUnit}</p>
+            <p className="text-indigo-400">Volume: {data.volume}k {weightUnit}</p>
+            <p className="text-amber-400">Est. 1RM: {data.e1RM} {weightUnit}</p>
           </div>
         </div>
       );

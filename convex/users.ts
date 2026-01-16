@@ -45,7 +45,7 @@ export const upsertProfile = mutation({
         clerkUserId: userId,
         email: identity?.email ?? "",
         displayName: args.displayName,
-        units: args.units ?? "lb",
+        units: args.units ?? "kg",
         goals: args.goals,
         aiUsageCount: 0,
         createdAt: Date.now(),
@@ -70,7 +70,7 @@ export const ensureUser = mutation({
       return await ctx.db.insert("users", {
         clerkUserId: userId,
         email: identity?.email ?? "",
-        units: "lb",
+        units: "kg",
         aiUsageCount: 0,
         createdAt: Date.now(),
       });

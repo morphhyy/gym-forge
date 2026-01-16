@@ -32,11 +32,14 @@ export default defineSchema({
     userId: v.string(),
     name: v.string(),
     active: v.boolean(),
-    planVersion: v.number(),
     createdAt: v.number(),
+    // Sharing fields
+    shareToken: v.optional(v.string()),
+    sharedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
-    .index("by_user_active", ["userId", "active"]),
+    .index("by_user_active", ["userId", "active"])
+    .index("by_share_token", ["shareToken"]),
 
   // Plan days (Mon-Sun for each plan)
   planDays: defineTable({

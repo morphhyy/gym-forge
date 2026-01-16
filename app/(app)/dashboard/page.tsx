@@ -21,7 +21,7 @@ export default function DashboardPage() {
   const weeklyStats = useQuery(api.progress.getWeeklySummary, { weeks: 4 });
   const userData = useQuery(api.users.getCurrentUser);
 
-  const weightUnit = userData?.units || "lb";
+  const weightUnit = userData?.units || "kg";
 
   const isLoading =
     activePlan === undefined ||
@@ -113,7 +113,7 @@ export default function DashboardPage() {
           <h3 className="font-semibold text-lg mb-1">Workout Plan</h3>
           {activePlan ? (
             <p className="text-muted-foreground text-sm">
-              {activePlan.name} — v{activePlan.planVersion}
+              {activePlan.name}
             </p>
           ) : (
             <p className="text-muted-foreground text-sm">

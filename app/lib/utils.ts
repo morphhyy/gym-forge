@@ -19,7 +19,7 @@ export function calculateVolume(
 }
 
 // Format weight with units
-export function formatWeight(weight: number, units: "lb" | "kg" = "lb"): string {
+export function formatWeight(weight: number, units: "lb" | "kg" = "kg"): string {
   return `${weight} ${units}`;
 }
 

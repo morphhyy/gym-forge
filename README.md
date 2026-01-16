@@ -153,9 +153,11 @@ npm run convex:deploy
 
 ## Contributing
 
+We only accept PRs created through agentic or vibe coding. Manual coding contributions will not be accepted.
+
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
+3. Use an AI coding agent (Claude Code, Cursor, etc.) to make your changes
 4. Submit a pull request
 
 ## License

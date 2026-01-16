@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { User, Settings, LogOut, Save, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function ProfilePage() {
   const { user: clerkUser } = useUser();
@@ -13,7 +14,7 @@ export default function ProfilePage() {
   const upsertProfile = useMutation(api.users.upsertProfile);
 
   const [displayName, setDisplayName] = useState("");
-  const [units, setUnits] = useState<"lb" | "kg">("lb");
+  const [units, setUnits] = useState<"lb" | "kg">("kg");
   const [goals, setGoals] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -21,7 +22,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (userData) {
       setDisplayName(userData.displayName || "");
-      setUnits(userData.units || "lb");
+      setUnits(userData.units || "kg");
       setGoals(userData.goals || "");
     }
   }, [userData]);
@@ -115,22 +116,22 @@ export default function ProfilePage() {
               Weight Units
             </label>
             <div className="flex gap-2">
-              <button
+              <Button
                 onClick={() => setUnits("lb")}
                 className={`btn flex-1 ${
                   units === "lb" ? "btn-primary" : "btn-secondary"
                 }`}
               >
                 Pounds (lb)
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setUnits("kg")}
                 className={`btn flex-1 ${
                   units === "kg" ? "btn-primary" : "btn-secondary"
                 }`}
               >
                 Kilograms (kg)
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -150,7 +151,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="flex justify-end mt-6 pt-6 border-t border-border">
-          <button
+          <Button
             onClick={handleSave}
             disabled={isSaving}
             className="btn btn-primary"
@@ -163,7 +164,7 @@ export default function ProfilePage() {
               <Save className="w-4 h-4" />
             )}
             {saved ? "Saved!" : "Save Changes"}
-          </button>
+          </Button>
         </div>
       </div>
 
