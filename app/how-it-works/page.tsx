@@ -1,50 +1,30 @@
 "use client";
 
 import { SignUpButton, useAuth } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import Link from "next/link";
 import {
+  ArrowRight,
+  BarChart3,
+  Brain,
+  Calendar,
+  CheckCircle2,
+  ClipboardList,
+  Clock,
+  Database,
   Dumbbell,
   LineChart,
-  Calendar,
-  Target,
-  ArrowRight,
-  ArrowLeft,
-  Sparkles,
-  ClipboardList,
-  TrendingUp,
-  CheckCircle2,
-  Brain,
+  Repeat,
   Share2,
-  Database,
   Shield,
   Smartphone,
-  Zap,
-  BarChart3,
+  Sparkles,
+  Target,
+  TrendingUp,
   Users,
-  Clock,
-  Repeat,
+  Zap,
 } from "lucide-react";
+import Link from "next/link";
 
 export default function HowItWorksPage() {
-  const { isSignedIn, isLoaded } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      router.push("/dashboard");
-    }
-  }, [isLoaded, isSignedIn, router]);
-
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen">
       {/* Navigation */}
@@ -64,7 +44,7 @@ export default function HowItWorksPage() {
 
       {/* Hero Section */}
       <section className="relative py-20 px-6 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
+        <div className="absolute inset-0 bg-linear-to-br from-primary/5 via-transparent to-secondary/5" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl" />
 
         <div className="relative z-10 max-w-4xl mx-auto text-center">

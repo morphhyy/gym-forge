@@ -743,12 +743,15 @@ export default function PlanPage() {
                                   type="number"
                                   min="1"
                                   max="50"
-                                  value={set.repsTarget}
+                                  value={set.repsTarget || ""}
+                                  onFocus={(e) => e.target.select()}
                                   onChange={(e) => {
+                                    const value = e.target.value;
                                     const newSets = [...exercise.sets];
                                     newSets[setIndex] = {
                                       ...newSets[setIndex],
-                                      repsTarget: parseInt(e.target.value) || 8,
+                                      repsTarget:
+                                        value === "" ? 0 : parseInt(value),
                                     };
                                     updateExerciseSets(
                                       dayIndex,
