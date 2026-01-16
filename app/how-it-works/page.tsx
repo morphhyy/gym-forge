@@ -128,9 +128,9 @@ export default function HowItWorksPage() {
                 Build Your Perfect Workout Schedule
               </h2>
               <p className="text-muted-foreground text-lg mb-8">
-                Choose between AI-powered plan generation or manual creation.
-                Either way, you&apos;ll have a complete weekly workout template
-                ready to go.
+                Choose between AI-powered generation, popular templates, or
+                manual creation. You&apos;ll have a complete weekly workout
+                template ready to go.
               </p>
 
               <div className="space-y-6">
@@ -150,9 +150,23 @@ export default function HowItWorksPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-4">
+                  <div className="flex gap-4">
                   <div className="w-12 h-12 bg-primary-muted rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Calendar className="w-6 h-6 text-primary" />
+                    <ClipboardList className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">Popular Templates</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Get started instantly with proven workout splits like PPL
+                      (Push/Pull/Legs), Arnold Split, Upper/Lower, or Full Body
+                      routines. Perfect for jumping right in.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex gap-4">
+                  <div className="w-12 h-12 bg-secondary/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Calendar className="w-6 h-6 text-secondary" />
                   </div>
                   <div>
                     <h3 className="font-semibold mb-1">Manual Creation</h3>
@@ -164,21 +178,7 @@ export default function HowItWorksPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 bg-secondary/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Dumbbell className="w-6 h-6 text-secondary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">
-                      Custom Exercise Library
-                    </h3>
-                    <p className="text-muted-foreground text-sm">
-                      Don&apos;t see your favorite exercise? Create custom
-                      exercises with muscle group and equipment tags. Your
-                      library grows with you.
-                    </p>
-                  </div>
-                </div>
+                
               </div>
             </div>
 
