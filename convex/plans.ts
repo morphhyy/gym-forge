@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { requireAuth } from "./auth";
+import { requireAuth, getAuthUserId } from "./auth";
 import { Id } from "./_generated/dataModel";
 import { nanoid } from "nanoid";
 
@@ -8,8 +8,9 @@ import { nanoid } from "nanoid";
 export const getActivePlan = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await requireAuth(ctx);
-    
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
     const plan = await ctx.db
       .query("plans")
       .withIndex("by_user_active", (q) => 
@@ -62,8 +63,9 @@ export const getActivePlan = query({
 export const getAllPlans = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await requireAuth(ctx);
-    
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
     return await ctx.db
       .query("plans")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -75,8 +77,9 @@ export const getAllPlans = query({
 export const getPlanById = query({
   args: { planId: v.id("plans") },
   handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-    
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
     const plan = await ctx.db.get(args.planId);
     if (!plan || plan.userId !== userId) return null;
 
@@ -117,8 +120,9 @@ export const getPlanById = query({
 export const getTodayTemplate = query({
   args: { date: v.string() },
   handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-    
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
     // Get weekday (0=Sunday, 6=Saturday - matches JS Date.getDay())
     const dateObj = new Date(args.date);
     const weekday = dateObj.getUTCDay();

@@ -10,6 +10,15 @@ export default defineSchema({
     units: v.optional(v.union(v.literal("kg"), v.literal("lb"))),
     goals: v.optional(v.string()),
     aiUsageCount: v.optional(v.number()), // Track AI plan generation usage
+    // Streak tracking
+    currentStreak: v.optional(v.number()),
+    longestStreak: v.optional(v.number()),
+    lastWorkoutDate: v.optional(v.string()), // ISO date string
+    weeklyGoal: v.optional(v.number()), // Target workouts per week (1-7)
+    // Rest timer preferences
+    defaultRestSeconds: v.optional(v.number()),
+    restTimerSound: v.optional(v.boolean()),
+    restTimerVibrate: v.optional(v.boolean()),
     createdAt: v.number(),
   })
     .index("by_clerk_id", ["clerkUserId"])
@@ -61,6 +70,7 @@ export default defineSchema({
         notes: v.optional(v.string()),
       })
     ),
+    restSeconds: v.optional(v.number()), // Rest time between sets
     createdAt: v.number(),
   }).index("by_plan_day", ["planDayId"]),
 
@@ -89,4 +99,34 @@ export default defineSchema({
   })
     .index("by_session", ["sessionId"])
     .index("by_session_exercise", ["sessionId", "exerciseId"]),
+
+  // Achievement badges for gamification
+  achievements: defineTable({
+    userId: v.string(),
+    type: v.string(), // e.g., "streak_7", "streak_30", "first_pr", "volume_10k"
+    unlockedAt: v.number(),
+    metadata: v.optional(v.any()), // Extra data (e.g., { streak: 30 })
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_type", ["userId", "type"]),
+
+  // Personal records tracking
+  personalRecords: defineTable({
+    userId: v.string(),
+    exerciseId: v.id("exercises"),
+    recordType: v.union(
+      v.literal("weight"),
+      v.literal("volume"),
+      v.literal("e1rm")
+    ),
+    value: v.number(),
+    reps: v.optional(v.number()), // For weight PRs
+    setDate: v.string(), // ISO date string
+    sessionId: v.id("sessions"),
+    previousValue: v.optional(v.number()), // What the old PR was
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_exercise", ["userId", "exerciseId"])
+    .index("by_user_exercise_type", ["userId", "exerciseId", "recordType"]),
 });

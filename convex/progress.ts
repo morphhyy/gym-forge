@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
-import { requireAuth } from "./auth";
+import { requireAuth, getAuthUserId } from "./auth";
 
 // Get exercise history for charts
 export const getExerciseHistory = query({
@@ -10,7 +10,9 @@ export const getExerciseHistory = query({
     days: v.optional(v.number()), // Number of days to look back
   },
   handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
     const daysBack = args.days ?? 90;
     
     const cutoffDate = new Date();
@@ -72,7 +74,9 @@ export const getWeeklySummary = query({
     weeks: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
     const weeksBack = args.weeks ?? 8;
     
     const cutoffDate = new Date();
@@ -141,8 +145,9 @@ export const getWeeklySummary = query({
 export const getAllExerciseStats = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await requireAuth(ctx);
-    
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
     // Get recent sessions (last 30 days)
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - 30);
@@ -227,8 +232,9 @@ function getWeekStart(date: Date): string {
 export const getExerciseSuggestions = query({
   args: { exerciseId: v.id("exercises") },
   handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-    
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { suggestion: null, recentData: [] };
+
     // Get last 4 sessions for this exercise
     const sessions = await ctx.db
       .query("sessions")

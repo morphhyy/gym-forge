@@ -17,6 +17,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useAchievementToasts } from "@/app/components/achievement-toast";
+import { StreakBadge } from "@/app/components/streak-badge";
+import { useRestTimer } from "@/app/components/rest-timer";
 
 type SetLog = {
   exerciseId: Id<"exercises">;
@@ -32,6 +35,7 @@ export default function LogPage() {
   );
   const [setLogs, setSetLogs] = useState<Record<string, SetLog>>({});
   const [completingSession, setCompletingSession] = useState(false);
+  const [completedStreak, setCompletedStreak] = useState<number | null>(null);
 
   const todayTemplate = useQuery(api.plans.getTodayTemplate, {
     date: selectedDate,
@@ -40,6 +44,9 @@ export default function LogPage() {
     date: selectedDate,
   });
   const userData = useQuery(api.users.getCurrentUser);
+
+  const { showAchievements, AchievementToasts } = useAchievementToasts();
+  const { openTimer, RestTimer } = useRestTimer(userData?.defaultRestSeconds ?? 90);
 
   const weightUnit = userData?.units || "kg";
 
@@ -96,7 +103,7 @@ export default function LogPage() {
     }));
   };
 
-  const saveSet = async (exerciseId: Id<"exercises">, setIndex: number) => {
+  const saveSet = async (exerciseId: Id<"exercises">, setIndex: number, restSeconds?: number) => {
     const key = getSetKey(exerciseId, setIndex);
     const setData = setLogs[key];
     if (!setData || (setData.repsActual === 0 && setData.weight === 0)) return;
@@ -119,6 +126,10 @@ export default function LogPage() {
         ...prev,
         [key]: { ...prev[key], saved: true },
       }));
+
+      // Start rest timer
+      const defaultRest = userData?.defaultRestSeconds ?? 90;
+      openTimer(restSeconds ?? defaultRest);
     } catch (error) {
       console.error("Failed to save set:", error);
     }
@@ -128,7 +139,17 @@ export default function LogPage() {
     if (!sessionData?._id) return;
     setCompletingSession(true);
     try {
-      await completeSession({ sessionId: sessionData._id });
+      const result = await completeSession({ sessionId: sessionData._id });
+
+      // Handle streak result
+      if (result.streakResult) {
+        setCompletedStreak(result.streakResult.streak);
+
+        // Show achievement toasts for new achievements
+        if (result.streakResult.newAchievements.length > 0) {
+          showAchievements(result.streakResult.newAchievements);
+        }
+      }
     } catch (error) {
       console.error("Failed to complete session:", error);
     } finally {
@@ -202,18 +223,29 @@ export default function LogPage() {
         </div>
       </div>
 
+      {/* Achievement Toasts */}
+      <AchievementToasts />
+
+      {/* Rest Timer */}
+      <RestTimer />
+
       {/* Session Status */}
       {isCompleted && (
-        <div className="card bg-primary-muted border-primary/30 flex items-center gap-4">
-          <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
-            <Trophy className="w-6 h-6 text-primary" />
+        <div className="card bg-primary-muted border-primary/30 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
+              <Trophy className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-primary">Workout Completed!</h3>
+              <p className="text-sm text-muted-foreground">
+                Finished at {format(new Date(sessionData.completedAt!), "h:mm a")}
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold text-primary">Workout Completed!</h3>
-            <p className="text-sm text-muted-foreground">
-              Finished at {format(new Date(sessionData.completedAt!), "h:mm a")}
-            </p>
-          </div>
+          {completedStreak !== null && completedStreak > 0 && (
+            <StreakBadge streak={completedStreak} size="md" showLabel />
+          )}
         </div>
       )}
 

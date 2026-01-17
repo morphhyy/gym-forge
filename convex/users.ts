@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { requireAuth } from "./auth";
+import { requireAuth, getAuthUserId } from "./auth";
 
 const MAX_FREE_AI_USES = 1;
 
@@ -8,7 +8,9 @@ const MAX_FREE_AI_USES = 1;
 export const getCurrentUser = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await requireAuth(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
@@ -108,7 +110,14 @@ export const incrementAIUsage = mutation({
 export const getAIUsage = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await requireAuth(ctx);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return {
+        usageCount: 0,
+        remaining: MAX_FREE_AI_USES,
+        limit: MAX_FREE_AI_USES,
+      };
+    }
 
     const user = await ctx.db
       .query("users")

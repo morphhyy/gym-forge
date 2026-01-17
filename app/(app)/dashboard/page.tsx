@@ -9,24 +9,28 @@ import {
   LineChart,
   ChevronRight,
   TrendingUp,
-  Clock,
+  AlertCircle,
+  Trophy,
 } from "lucide-react";
 import { format } from "date-fns";
+import { StreakBadge } from "@/app/components/streak-badge";
+import { WeeklyProgressRing } from "@/app/components/weekly-progress-ring";
 
 export default function DashboardPage() {
   const today = format(new Date(), "yyyy-MM-dd");
   const activePlan = useQuery(api.plans.getActivePlan);
   const todayTemplate = useQuery(api.plans.getTodayTemplate, { date: today });
-  const recentSessions = useQuery(api.sessions.getRecentSessions, { limit: 5 });
   const weeklyStats = useQuery(api.progress.getWeeklySummary, { weeks: 4 });
   const userData = useQuery(api.users.getCurrentUser);
+  const streakData = useQuery(api.streaks.getStreakData);
+  const streakStatus = useQuery(api.streaks.getStreakStatus);
+  const userAchievements = useQuery(api.streaks.getUserAchievements);
 
   const weightUnit = userData?.units || "kg";
 
   const isLoading =
     activePlan === undefined ||
-    todayTemplate === undefined ||
-    recentSessions === undefined;
+    todayTemplate === undefined;
 
   if (isLoading) {
     return (
@@ -67,14 +71,38 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-          Welcome back
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          {format(new Date(), "EEEE, MMMM d")} — Let&apos;s crush it today.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            Welcome back
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {format(new Date(), "EEEE, MMMM d")} — Let&apos;s crush it today.
+          </p>
+        </div>
+        {streakData && (
+          <StreakBadge
+            streak={streakData.currentStreak}
+            size="lg"
+            showLabel
+          />
+        )}
       </div>
+
+      {/* Streak at risk warning */}
+      {streakStatus?.status === "at_risk" && streakStatus.streak > 0 && (
+        <div className="flex items-center gap-3 p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+          <AlertCircle className="w-5 h-5 text-orange-500 flex-shrink-0" />
+          <div>
+            <p className="font-medium text-orange-500">
+              Your {streakStatus.streak}-day streak is at risk!
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Complete a workout today to keep your streak going.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -139,12 +167,24 @@ export default function DashboardPage() {
 
       {/* Stats Row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Weekly Goal Progress */}
         <div className="card">
-          <p className="text-muted-foreground text-sm mb-1">This Week</p>
-          <p className="text-2xl font-bold">
-            {thisWeekStats?.sessionCount ?? 0}
-          </p>
-          <p className="text-muted-foreground text-xs">workouts</p>
+          {streakData ? (
+            <WeeklyProgressRing
+              completed={streakData.weeklyCompleted}
+              goal={streakData.weeklyGoal}
+              size="md"
+              showLabel
+            />
+          ) : (
+            <>
+              <p className="text-muted-foreground text-sm mb-1">This Week</p>
+              <p className="text-2xl font-bold">
+                {thisWeekStats?.sessionCount ?? 0}
+              </p>
+              <p className="text-muted-foreground text-xs">workouts</p>
+            </>
+          )}
         </div>
         <div className="card">
           <p className="text-muted-foreground text-sm mb-1">Weekly Volume</p>
@@ -225,29 +265,37 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Recent Activity */}
-      {recentSessions && recentSessions.length > 0 && (
+      {/* Achievements - minimal display */}
+      {userAchievements && userAchievements.length > 0 && (
         <div className="card">
-          <h2 className="font-semibold text-lg mb-4">Recent Activity</h2>
-          <div className="space-y-3">
-            {recentSessions.map((session: { _id: string; date: string; completedAt?: number | null }) => (
-              <div
-                key={session._id}
-                className="flex items-center justify-between py-2 border-b border-border last:border-0"
-              >
-                <div className="flex items-center gap-3">
-                  <Clock className="w-4 h-4 text-muted" />
-                  <span className="font-medium">
-                    {format(new Date(session.date), "EEE, MMM d")}
-                  </span>
-                </div>
-                {session.completedAt ? (
-                  <span className="badge">Completed</span>
-                ) : (
-                  <span className="badge badge-secondary">In Progress</span>
-                )}
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-yellow-500" />
+              <h2 className="font-semibold">Achievements</h2>
+            </div>
+            <span className="text-sm text-muted-foreground">{userAchievements.length} unlocked</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {userAchievements.slice(0, 6).map((achievement: { _id: string; type: string }) => {
+              const achievementConfig: Record<string, { label: string; color: string }> = {
+                first_workout: { label: "First Steps", color: "bg-primary/10 text-primary" },
+                streak_3: { label: "On Fire", color: "bg-orange-500/10 text-orange-500" },
+                streak_7: { label: "Week Warrior", color: "bg-orange-500/10 text-orange-500" },
+                streak_14: { label: "Consistency King", color: "bg-orange-500/10 text-orange-500" },
+                streak_30: { label: "Iron Will", color: "bg-yellow-500/10 text-yellow-500" },
+                first_pr: { label: "Record Breaker", color: "bg-yellow-500/10 text-yellow-500" },
+              };
+              const config = achievementConfig[achievement.type] || { label: achievement.type, color: "bg-muted text-muted-foreground" };
+
+              return (
+                <span
+                  key={achievement._id}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium ${config.color}`}
+                >
+                  {config.label}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}

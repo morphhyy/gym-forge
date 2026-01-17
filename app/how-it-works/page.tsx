@@ -11,14 +11,18 @@ import {
   Clock,
   Database,
   Dumbbell,
+  Flame,
   LineChart,
+  Medal,
   Repeat,
   Share2,
   Shield,
   Smartphone,
   Sparkles,
   Target,
+  Timer,
   TrendingUp,
+  Trophy,
   Users,
   Zap,
 } from "lucide-react";
@@ -363,8 +367,8 @@ export default function HowItWorksPage() {
                 </div>
 
                 <div className="flex gap-4">
-                  <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Clock className="w-6 h-6 text-accent" />
+                  <div className="w-12 h-12 bg-cyan-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Clock className="w-6 h-6 text-cyan-500" />
                   </div>
                   <div>
                     <h3 className="font-semibold mb-1">Past Date Logging</h3>
@@ -432,8 +436,8 @@ export default function HowItWorksPage() {
                 </div>
 
                 <div className="flex gap-4">
-                  <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <BarChart3 className="w-6 h-6 text-accent" />
+                  <div className="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <BarChart3 className="w-6 h-6 text-amber-500" />
                   </div>
                   <div>
                     <h3 className="font-semibold mb-1">
@@ -654,8 +658,8 @@ export default function HowItWorksPage() {
             </div>
 
             <div className="card">
-              <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center mb-4">
-                <Database className="w-6 h-6 text-accent" />
+              <div className="w-12 h-12 bg-cyan-500/20 rounded-xl flex items-center justify-center mb-4">
+                <Database className="w-6 h-6 text-cyan-500" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Real-time Sync</h3>
               <p className="text-muted-foreground text-sm">
@@ -695,6 +699,152 @@ export default function HowItWorksPage() {
                 Pre-loaded with popular exercises across all muscle groups:
                 Chest, Back, Shoulders, Legs, Arms, and Core.
               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Engagement Features */}
+      <section className="py-20 px-6 bg-gradient-to-br from-orange-500/5 via-transparent to-yellow-500/5">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500/10 rounded-full text-orange-400 text-sm font-medium mb-4">
+              <Flame className="w-4 h-4" />
+              Stay Motivated
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+              Built-in Motivation Features
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Stay consistent and celebrate your wins with gamification features
+              designed to keep you coming back.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Streaks */}
+            <div className="card">
+              <div className="w-14 h-14 bg-orange-500/20 rounded-2xl flex items-center justify-center mb-6">
+                <Flame className="w-8 h-8 text-orange-500" />
+              </div>
+              <h3 className="text-xl font-semibold mb-3">Workout Streaks</h3>
+              <p className="text-muted-foreground mb-4">
+                Build consistency with daily workout streaks. Track your current
+                streak, longest streak, and weekly workout goals.
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                  <div className="w-8 h-8 bg-orange-500/20 rounded-full flex items-center justify-center">
+                    <Flame className="w-4 h-4 text-orange-500" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-orange-500">7 Day Streak</div>
+                    <div className="text-xs text-muted-foreground">Week Warrior badge</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                  <div className="w-8 h-8 bg-yellow-500/20 rounded-full flex items-center justify-center">
+                    <Target className="w-4 h-4 text-yellow-500" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Weekly Goal Progress</div>
+                    <div className="text-xs text-muted-foreground">Set 1-7 workouts per week</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Rest Timer */}
+            <div className="card">
+              <div className="w-14 h-14 bg-blue-500/20 rounded-2xl flex items-center justify-center mb-6">
+                <Timer className="w-8 h-8 text-blue-500" />
+              </div>
+              <h3 className="text-xl font-semibold mb-3">Rest Timer</h3>
+              <p className="text-muted-foreground mb-4">
+                Never guess your rest periods again. After logging each set, an
+                automatic rest timer helps you maintain optimal recovery.
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                  <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-blue-500" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Auto-start Timer</div>
+                    <div className="text-xs text-muted-foreground">Starts after each logged set</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                  <div className="w-8 h-8 bg-cyan-500/20 rounded-full flex items-center justify-center">
+                    <Zap className="w-4 h-4 text-cyan-500" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Adjustable Duration</div>
+                    <div className="text-xs text-muted-foreground">+15s/-15s quick adjustments</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* PR Tracking */}
+            <div className="card">
+              <div className="w-14 h-14 bg-yellow-500/20 rounded-2xl flex items-center justify-center mb-6">
+                <Trophy className="w-8 h-8 text-yellow-500" />
+              </div>
+              <h3 className="text-xl font-semibold mb-3">Personal Records</h3>
+              <p className="text-muted-foreground mb-4">
+                Celebrate every PR with automatic detection and celebration
+                animations. Track weight PRs, volume PRs, and estimated 1RM records.
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                  <div className="w-8 h-8 bg-yellow-500/20 rounded-full flex items-center justify-center">
+                    <Trophy className="w-4 h-4 text-yellow-500" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Weight PR</div>
+                    <div className="text-xs text-muted-foreground">Heaviest lift for each exercise</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                  <div className="w-8 h-8 bg-purple-500/20 rounded-full flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4 text-purple-500" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Est. 1RM PR</div>
+                    <div className="text-xs text-muted-foreground">Calculated using Epley formula</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Achievement Badges */}
+          <div className="mt-12 p-6 bg-card rounded-2xl border border-border">
+            <div className="flex items-center gap-3 mb-6">
+              <Medal className="w-6 h-6 text-amber-500" />
+              <h3 className="text-lg font-semibold">Achievement Badges</h3>
+            </div>
+            <p className="text-muted-foreground mb-6">
+              Earn badges as you hit milestones. From your first PR to a 100-day
+              streak, every achievement is celebrated.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {[
+                { name: "First PR", color: "bg-yellow-500/20 text-yellow-500" },
+                { name: "3-Day Streak", color: "bg-orange-500/20 text-orange-500" },
+                { name: "Week Warrior", color: "bg-blue-500/20 text-blue-500" },
+                { name: "Two Week Titan", color: "bg-purple-500/20 text-purple-500" },
+                { name: "Monthly Master", color: "bg-pink-500/20 text-pink-500" },
+                { name: "Century Club", color: "bg-amber-500/20 text-amber-500" },
+              ].map((badge) => (
+                <span
+                  key={badge.name}
+                  className={`px-4 py-2 rounded-full text-sm font-medium ${badge.color}`}
+                >
+                  {badge.name}
+                </span>
+              ))}
             </div>
           </div>
         </div>
