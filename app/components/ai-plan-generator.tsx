@@ -51,10 +51,10 @@ const promptSuggestions = [
     icon: "🌱",
   },
   {
-    title: "Push/Pull/Legs",
+    title: "Home Workout",
     prompt:
-      "Create a 6-day push/pull/legs split for intermediate lifters focused on muscle building. Include 4-5 exercises per day.",
-    icon: "💪",
+      "Create a 3-day full body home workout plan using only dumbbells and bodyweight exercises. Focus on general fitness and core strength.",
+    icon: "🏠",
   },
   {
     title: "Strength Focus",

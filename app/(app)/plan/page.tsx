@@ -7,6 +7,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { ExerciseSelector } from "@/app/components/exercise-selector";
 import { AIPlanGenerator } from "@/app/components/ai-plan-generator";
 import { SharePlanDialog } from "@/app/components/share-plan-dialog";
+import { PredefinedPlanSelector } from "@/app/components/predefined-plan-selector";
 import {
   Plus,
   Trash2,
@@ -18,6 +19,7 @@ import {
   Edit2,
   Sparkles,
   Share2,
+  ClipboardList,
 } from "lucide-react";
 import { getDayName, getShortDayName } from "@/app/lib/utils";
 import { toast } from "sonner";
@@ -53,6 +55,7 @@ export default function PlanPage() {
     number | null
   >(null);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
+  const [showPredefinedSelector, setShowPredefinedSelector] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<Id<"plans"> | null>(null);
@@ -164,6 +167,39 @@ export default function PlanPage() {
     setIsEditing(true);
     setExpandedDay(0);
     setIsAIGenerated(true);
+    setEditingPlanId(null);
+  };
+
+  const handlePredefinedPlanSelected = (plan: {
+    planName: string;
+    description: string;
+    days: {
+      weekday: number;
+      name?: string;
+      exercises: {
+        exerciseId: string;
+        exerciseName: string;
+        sets: { repsTarget: number; notes?: string }[];
+      }[];
+    }[];
+  }) => {
+    setPlanName(plan.planName);
+    setDays(
+      plan.days.map((day) => ({
+        weekday: day.weekday,
+        name: day.name,
+        exercises: day.exercises.map((ex, exIdx) => ({
+          exerciseId: ex.exerciseId as Id<"exercises">,
+          exerciseName: ex.exerciseName,
+          order: exIdx,
+          sets: ex.sets,
+        })),
+      }))
+    );
+    setShowPredefinedSelector(false);
+    setIsEditing(true);
+    setExpandedDay(0);
+    setIsAIGenerated(false);
     setEditingPlanId(null);
   };
 
@@ -327,6 +363,13 @@ export default function PlanPage() {
                 Create Manually
               </button>
               <button
+                onClick={() => setShowPredefinedSelector(true)}
+                className="btn btn-template"
+              >
+                <ClipboardList className="w-4 h-4" />
+                Use Template
+              </button>
+              <button
                 onClick={() => setShowAIGenerator(true)}
                 disabled={aiUsage?.isLimitReached}
                 className="btn btn-ai"
@@ -343,6 +386,13 @@ export default function PlanPage() {
             onOpenChange={setShowAIGenerator}
             onPlanGenerated={handleAIPlanGenerated}
           />
+
+          {/* Predefined Plan Selector Modal */}
+          <PredefinedPlanSelector
+            open={showPredefinedSelector}
+            onOpenChange={setShowPredefinedSelector}
+            onPlanSelected={handlePredefinedPlanSelected}
+          />
         </div>
       );
     }
@@ -358,7 +408,7 @@ export default function PlanPage() {
               Created {new Date(activePlan.createdAt).toLocaleDateString()}
             </p>
           </div>
-          <div className="grid grid-cols-4 sm:flex gap-2 sm:gap-3 w-full sm:w-auto">
+          <div className="grid grid-cols-5 sm:flex gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={startEditing}
               className="btn btn-secondary text-sm sm:text-base"
@@ -372,6 +422,13 @@ export default function PlanPage() {
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">New</span>
+            </button>
+            <button
+              onClick={() => setShowPredefinedSelector(true)}
+              className="btn btn-template text-sm sm:text-base"
+            >
+              <ClipboardList className="w-4 h-4" />
+              <span className="hidden sm:inline">Template</span>
             </button>
             <button
               onClick={() => setShowShareDialog(true)}
@@ -570,6 +627,13 @@ export default function PlanPage() {
           open={showAIGenerator}
           onOpenChange={setShowAIGenerator}
           onPlanGenerated={handleAIPlanGenerated}
+        />
+
+        {/* Predefined Plan Selector Modal */}
+        <PredefinedPlanSelector
+          open={showPredefinedSelector}
+          onOpenChange={setShowPredefinedSelector}
+          onPlanSelected={handlePredefinedPlanSelected}
         />
 
         {/* Share Plan Dialog */}

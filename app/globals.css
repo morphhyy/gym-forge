@@ -203,6 +203,20 @@ body {
   background: linear-gradient(to right, #9333ea, #db2777);
 }
 
+.btn-template {
+  background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
+  color: #0a0a0c;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-template:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
+}
+
 /* Card */
 .card {
   background: var(--card);
