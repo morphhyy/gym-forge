@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { requireAuth, getAuthUserId } from "./auth";
+import { getAuthUserId, requireAuth } from "./auth";
+import {
+  computePlannedStreak,
+  getWorkoutWeekdaysFromActivePlan,
+  isWorkoutDayForDate,
+} from "./lib/plannedStreak";
 
 // Get or create today's session
 export const getOrCreateSession = mutation({
@@ -10,11 +15,11 @@ export const getOrCreateSession = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
-    
+
     // Check for existing session
     const existingSession = await ctx.db
       .query("sessions")
-      .withIndex("by_user_date", (q) => 
+      .withIndex("by_user_date", (q) =>
         q.eq("userId", userId).eq("date", args.date)
       )
       .first();
@@ -47,7 +52,7 @@ export const getSessionByDate = query({
 
     const session = await ctx.db
       .query("sessions")
-      .withIndex("by_user_date", (q) => 
+      .withIndex("by_user_date", (q) =>
         q.eq("userId", userId).eq("date", args.date)
       )
       .first();
@@ -87,7 +92,7 @@ export const logSet = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
-    
+
     // Verify session belongs to user
     const session = await ctx.db.get(args.sessionId);
     if (!session || session.userId !== userId) {
@@ -97,7 +102,7 @@ export const logSet = mutation({
     // Check for existing set at this index
     const existingSet = await ctx.db
       .query("sessionSets")
-      .withIndex("by_session_exercise", (q) => 
+      .withIndex("by_session_exercise", (q) =>
         q.eq("sessionId", args.sessionId).eq("exerciseId", args.exerciseId)
       )
       .filter((q) => q.eq(q.field("setIndex"), args.setIndex))
@@ -176,29 +181,29 @@ export const completeSession = mutation({
         .first();
 
       if (user) {
-        const lastWorkoutDate = user.lastWorkoutDate;
-        const currentStreak = user.currentStreak ?? 0;
-        const longestStreak = user.longestStreak ?? 0;
         const sessionDate = session.date;
+        const currentStoredStreak = user.currentStreak ?? 0;
+        const longestStreak = user.longestStreak ?? 0;
 
-        let newStreak = currentStreak;
-        const newAchievements: string[] = [];
+        // Get workout weekdays from active plan
+        const workoutWeekdays = await getWorkoutWeekdaysFromActivePlan(ctx, userId);
 
-        // Don't update if already logged for this date
-        if (lastWorkoutDate !== sessionDate) {
-          if (!lastWorkoutDate) {
-            newStreak = 1;
-          } else if (areConsecutiveDays(lastWorkoutDate, sessionDate)) {
-            newStreak = currentStreak + 1;
-          } else {
-            newStreak = 1;
-          }
+        // Check if this is a workout day (according to the plan)
+        const isPlannedWorkoutDay = workoutWeekdays
+          ? isWorkoutDayForDate(sessionDate, workoutWeekdays)
+          : true; // If no plan, treat every day as a potential workout day
 
+        // Only update streak counters if this is a planned workout day
+        if (isPlannedWorkoutDay && workoutWeekdays && workoutWeekdays.size > 0) {
+          // Use plan-aware streak computation
+          const streakData = await computePlannedStreak(ctx, userId, sessionDate, workoutWeekdays);
+          const newStreak = streakData.streak;
           const newLongestStreak = Math.max(longestStreak, newStreak);
+          const newAchievements: string[] = [];
 
-          // Check for new achievements
+          // Check for new achievements based on plan-aware streak
           for (const achievement of STREAK_ACHIEVEMENTS) {
-            if (newStreak >= achievement.threshold && currentStreak < achievement.threshold) {
+            if (newStreak >= achievement.threshold && currentStoredStreak < achievement.threshold) {
               const existing = await ctx.db
                 .query("achievements")
                 .withIndex("by_user_type", (q) =>
@@ -218,6 +223,7 @@ export const completeSession = mutation({
             }
           }
 
+          // Update user record with plan-aware streak
           await ctx.db.patch(user._id, {
             currentStreak: newStreak,
             longestStreak: newLongestStreak,
@@ -228,6 +234,69 @@ export const completeSession = mutation({
             streak: newStreak,
             longestStreak: newLongestStreak,
             newAchievements,
+          };
+        } else if (!workoutWeekdays || workoutWeekdays.size === 0) {
+          // Fallback: no active plan, use old calendar-based streak logic
+          const lastWorkoutDate = user.lastWorkoutDate;
+          let newStreak = currentStoredStreak;
+          const newAchievements: string[] = [];
+
+          if (lastWorkoutDate !== sessionDate) {
+            if (!lastWorkoutDate) {
+              newStreak = 1;
+            } else if (areConsecutiveDays(lastWorkoutDate, sessionDate)) {
+              newStreak = currentStoredStreak + 1;
+            } else {
+              newStreak = 1;
+            }
+
+            const newLongestStreak = Math.max(longestStreak, newStreak);
+
+            // Check for new achievements
+            for (const achievement of STREAK_ACHIEVEMENTS) {
+              if (newStreak >= achievement.threshold && currentStoredStreak < achievement.threshold) {
+                const existing = await ctx.db
+                  .query("achievements")
+                  .withIndex("by_user_type", (q) =>
+                    q.eq("userId", userId).eq("type", achievement.type)
+                  )
+                  .first();
+
+                if (!existing) {
+                  await ctx.db.insert("achievements", {
+                    userId,
+                    type: achievement.type,
+                    unlockedAt: Date.now(),
+                    metadata: { streak: newStreak },
+                  });
+                  newAchievements.push(achievement.type);
+                }
+              }
+            }
+
+            await ctx.db.patch(user._id, {
+              currentStreak: newStreak,
+              longestStreak: newLongestStreak,
+              lastWorkoutDate: sessionDate,
+            });
+
+            streakResult = {
+              streak: newStreak,
+              longestStreak: newLongestStreak,
+              newAchievements,
+            };
+          }
+        } else {
+          // Rest day workout: don't update streak, but still record lastWorkoutDate
+          await ctx.db.patch(user._id, {
+            lastWorkoutDate: sessionDate,
+          });
+
+          // Return current streak without changes
+          streakResult = {
+            streak: currentStoredStreak,
+            longestStreak,
+            newAchievements: [],
           };
         }
       }
@@ -273,7 +342,7 @@ export const getLastWeightForExercise = query({
     for (const session of sessions) {
       const sets = await ctx.db
         .query("sessionSets")
-        .withIndex("by_session_exercise", (q) => 
+        .withIndex("by_session_exercise", (q) =>
           q.eq("sessionId", session._id).eq("exerciseId", args.exerciseId)
         )
         .first();

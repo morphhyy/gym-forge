@@ -24,8 +24,46 @@ import {
   Tooltip,
   CartesianGrid,
   Legend,
+  TooltipProps,
 } from "recharts";
 import { format, parseISO } from "date-fns";
+
+
+interface ChartDataPoint {
+  date: string;
+  fullDate: string;
+  topSet: number;
+  volume: number;
+  e1RM: number;
+  reps: number;
+}
+
+interface CustomTooltipProps extends TooltipProps<number, string> {
+  active?: boolean;
+  payload?: Array<{
+    payload: ChartDataPoint;
+  }>;
+  label?: string;
+  weightUnit?: string;
+}
+
+// Custom tooltip component - defined outside render to avoid recreation
+function CustomTooltip({ active, payload, weightUnit = "kg" }: CustomTooltipProps) {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+        <p className="font-medium mb-2">{data.fullDate}</p>
+        <div className="space-y-1 text-sm">
+          <p className="text-primary">Top Set: {data.topSet} {weightUnit} × {data.reps}</p>
+          <p className="text-indigo-400">Volume: {data.volume}k {weightUnit}</p>
+          <p className="text-amber-400">Est. 1RM: {data.e1RM} {weightUnit}</p>
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
 
 export default function ExerciseProgressPage() {
   const params = useParams();
@@ -42,7 +80,7 @@ export default function ExerciseProgressPage() {
   const userData = useQuery(api.users.getCurrentUser);
 
   const weightUnit = userData?.units || "kg";
-  const exercise = exercises?.find((e: { _id: string }) => e._id === exerciseId);
+  const exercise = exercises?.find((e) => e._id === exerciseId);
 
   const isLoading =
     history === undefined || suggestions === undefined || exercise === undefined;
@@ -73,7 +111,7 @@ export default function ExerciseProgressPage() {
     );
   }
 
-  const chartData = history.map((h: { date: string; topSetWeight: number; totalVolume: number; estimated1RM: number; topSetReps: number }) => ({
+  const chartData: ChartDataPoint[] = history.map((h) => ({
     date: format(parseISO(h.date), "MMM d"),
     fullDate: h.date,
     topSet: h.topSetWeight,
@@ -86,27 +124,10 @@ export default function ExerciseProgressPage() {
   const currentTopSet = history[history.length - 1]?.topSetWeight ?? 0;
   const previousTopSet = history[history.length - 2]?.topSetWeight ?? 0;
   const topSetChange = currentTopSet - previousTopSet;
-  
-  const bestWeight = Math.max(...history.map((h: { topSetWeight: number }) => h.topSetWeight), 0);
-  const bestE1RM = Math.max(...history.map((h: { estimated1RM: number }) => h.estimated1RM), 0);
-  const totalSessions = history.length;
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
-          <p className="font-medium mb-2">{data.fullDate}</p>
-          <div className="space-y-1 text-sm">
-            <p className="text-primary">Top Set: {data.topSet} {weightUnit} × {data.reps}</p>
-            <p className="text-indigo-400">Volume: {data.volume}k {weightUnit}</p>
-            <p className="text-amber-400">Est. 1RM: {data.e1RM} {weightUnit}</p>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
+  const bestWeight = Math.max(...history.map((h) => h.topSetWeight), 0);
+  const bestE1RM = Math.max(...history.map((h) => h.estimated1RM), 0);
+  const totalSessions = history.length;
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -131,22 +152,20 @@ export default function ExerciseProgressPage() {
       {/* Suggestion Card */}
       {suggestions.suggestion && (
         <div
-          className={`card flex items-start gap-4 ${
-            suggestions.suggestion === "increase"
-              ? "bg-primary-muted border-primary/30"
-              : suggestions.suggestion === "decrease"
-                ? "bg-danger-muted border-danger/30"
-                : "bg-card"
-          }`}
+          className={`card flex items-start gap-4 ${suggestions.suggestion === "increase"
+            ? "bg-primary-muted border-primary/30"
+            : suggestions.suggestion === "decrease"
+              ? "bg-danger-muted border-danger/30"
+              : "bg-card"
+            }`}
         >
           <div
-            className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-              suggestions.suggestion === "increase"
-                ? "bg-primary/20"
-                : suggestions.suggestion === "decrease"
-                  ? "bg-danger/20"
-                  : "bg-secondary/20"
-            }`}
+            className={`w-12 h-12 rounded-xl flex items-center justify-center ${suggestions.suggestion === "increase"
+              ? "bg-primary/20"
+              : suggestions.suggestion === "decrease"
+                ? "bg-danger/20"
+                : "bg-secondary/20"
+              }`}
           >
             {suggestions.suggestion === "increase" ? (
               <TrendingUp className="w-6 h-6 text-primary" />
@@ -158,13 +177,12 @@ export default function ExerciseProgressPage() {
           </div>
           <div>
             <h3
-              className={`font-semibold ${
-                suggestions.suggestion === "increase"
-                  ? "text-primary"
-                  : suggestions.suggestion === "decrease"
-                    ? "text-danger"
-                    : "text-secondary"
-              }`}
+              className={`font-semibold ${suggestions.suggestion === "increase"
+                ? "text-primary"
+                : suggestions.suggestion === "decrease"
+                  ? "text-danger"
+                  : "text-secondary"
+                }`}
             >
               {suggestions.suggestion === "increase"
                 ? "Ready to Progress!"
@@ -194,9 +212,8 @@ export default function ExerciseProgressPage() {
           </div>
           {topSetChange !== 0 && (
             <div
-              className={`flex items-center gap-1 mt-2 text-xs ${
-                topSetChange > 0 ? "text-primary" : "text-danger"
-              }`}
+              className={`flex items-center gap-1 mt-2 text-xs ${topSetChange > 0 ? "text-primary" : "text-danger"
+                }`}
             >
               {topSetChange > 0 ? (
                 <TrendingUp className="w-3 h-3" />
@@ -283,7 +300,7 @@ export default function ExerciseProgressPage() {
                     axisLine={false}
                     domain={["dataMin - 10", "dataMax + 10"]}
                   />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={<CustomTooltip weightUnit={weightUnit} />} />
                   <Area
                     type="monotone"
                     dataKey="topSet"
@@ -321,7 +338,7 @@ export default function ExerciseProgressPage() {
                     tickLine={false}
                     axisLine={false}
                   />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={<CustomTooltip weightUnit={weightUnit} />} />
                   <Legend
                     wrapperStyle={{ paddingTop: 20 }}
                     formatter={(value) => (
@@ -378,7 +395,7 @@ export default function ExerciseProgressPage() {
                     .slice()
                     .reverse()
                     .slice(0, 10)
-                    .map((session: { sessionId: string; date: string; topSetWeight: number; topSetReps: number; totalVolume: number; estimated1RM: number; setCount: number }, idx: number) => (
+                    .map((session) => (
                       <tr
                         key={session.sessionId}
                         className="border-b border-border/50 last:border-0"

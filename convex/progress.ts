@@ -1,7 +1,7 @@
 import { v } from "convex/values";
-import { query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
-import { requireAuth, getAuthUserId } from "./auth";
+import { query } from "./_generated/server";
+import { getAuthUserId } from "./auth";
 
 // Get exercise history for charts
 export const getExerciseHistory = query({
@@ -14,7 +14,7 @@ export const getExerciseHistory = query({
     if (!userId) return [];
 
     const daysBack = args.days ?? 90;
-    
+
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysBack);
     const cutoffString = cutoffDate.toISOString().split("T")[0];
@@ -31,17 +31,17 @@ export const getExerciseHistory = query({
     for (const session of sessions) {
       const sets = await ctx.db
         .query("sessionSets")
-        .withIndex("by_session_exercise", (q) => 
+        .withIndex("by_session_exercise", (q) =>
           q.eq("sessionId", session._id).eq("exerciseId", args.exerciseId)
         )
         .collect();
 
       if (sets.length > 0) {
         // Calculate metrics
-        const topSet = sets.reduce((best, set) => 
+        const topSet = sets.reduce((best, set) =>
           set.weight > best.weight ? set : best
-        , sets[0]);
-        
+          , sets[0]);
+
         const totalVolume = sets.reduce(
           (sum, set) => sum + set.weight * set.repsActual,
           0
@@ -78,7 +78,7 @@ export const getWeeklySummary = query({
     if (!userId) return [];
 
     const weeksBack = args.weeks ?? 8;
-    
+
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - weeksBack * 7);
     const cutoffString = cutoffDate.toISOString().split("T")[0];
@@ -102,7 +102,7 @@ export const getWeeklySummary = query({
     for (const session of sessions) {
       const date = new Date(session.date);
       const weekStart = getWeekStart(date);
-      
+
       if (!weeklyData[weekStart]) {
         weeklyData[weekStart] = {
           weekStart,
@@ -148,25 +148,29 @@ export const getAllExerciseStats = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    // Get recent sessions (last 30 days)
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - 30);
-    const cutoffString = cutoffDate.toISOString().split("T")[0];
-
+    // Get ALL user sessions (not just last 30 days) for accurate stats
     const sessions = await ctx.db
       .query("sessions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .filter((q) => q.gte(q.field("date"), cutoffString))
       .collect();
+
+    // Calculate date thresholds
+    const now = new Date();
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoString = sevenDaysAgo.toISOString().split("T")[0];
 
     // Aggregate by exercise
     const exerciseStats: Record<string, {
       exerciseId: string;
       lastWeight: number;
       lastDate: string;
-      sessionCount: number;
+      sessionDates: Set<string>; // Track unique session dates
       totalVolume: number;
       bestWeight: number;
+      bestWeightDate: string; // When PR was set
+      oldestWeight: number; // First recorded weight
+      oldestDate: string; // First session date
     }> = {};
 
     for (const session of sessions) {
@@ -182,20 +186,35 @@ export const getAllExerciseStats = query({
             exerciseId: id,
             lastWeight: 0,
             lastDate: "",
-            sessionCount: 0,
+            sessionDates: new Set(),
             totalVolume: 0,
             bestWeight: 0,
+            bestWeightDate: "",
+            oldestWeight: set.weight,
+            oldestDate: session.date,
           };
         }
 
         const stats = exerciseStats[id];
         stats.totalVolume += set.weight * set.repsActual;
-        stats.bestWeight = Math.max(stats.bestWeight, set.weight);
-        
+        stats.sessionDates.add(session.date);
+
+        // Track best weight and when it was set
+        if (set.weight > stats.bestWeight) {
+          stats.bestWeight = set.weight;
+          stats.bestWeightDate = session.date;
+        }
+
+        // Track most recent session
         if (session.date > stats.lastDate) {
           stats.lastDate = session.date;
           stats.lastWeight = set.weight;
-          stats.sessionCount++;
+        }
+
+        // Track oldest session for trend calculation
+        if (session.date < stats.oldestDate) {
+          stats.oldestDate = session.date;
+          stats.oldestWeight = set.weight;
         }
       }
     }
@@ -205,15 +224,27 @@ export const getAllExerciseStats = query({
       Object.values(exerciseStats).map(async (stats) => {
         const exerciseId = stats.exerciseId as Id<"exercises">;
         const exercise = await ctx.db.get(exerciseId);
+
+        // Calculate if PR was recent (within 7 days)
+        const recentPR = stats.bestWeightDate >= sevenDaysAgoString;
+
         return {
-          ...stats,
+          exerciseId: stats.exerciseId,
           exerciseName: exercise?.name ?? "Unknown",
           muscleGroup: exercise?.muscleGroup,
+          lastWeight: stats.lastWeight,
+          lastDate: stats.lastDate,
+          sessionCount: stats.sessionDates.size, // Proper count of unique sessions
+          totalVolume: stats.totalVolume,
+          bestWeight: stats.bestWeight,
+          bestWeightDate: stats.bestWeightDate,
+          oldestWeight: stats.oldestWeight,
+          recentPR,
         };
       })
     );
 
-    return statsWithNames.sort((a, b) => 
+    return statsWithNames.sort((a, b) =>
       b.lastDate.localeCompare(a.lastDate)
     );
   },
@@ -250,7 +281,7 @@ export const getExerciseSuggestions = query({
     for (const session of sessions) {
       const sets = await ctx.db
         .query("sessionSets")
-        .withIndex("by_session_exercise", (q) => 
+        .withIndex("by_session_exercise", (q) =>
           q.eq("sessionId", session._id).eq("exerciseId", args.exerciseId)
         )
         .collect();
@@ -276,13 +307,13 @@ export const getExerciseSuggestions = query({
     const lastTwo = recentData.slice(0, 2);
     const [latest, previous] = lastTwo;
 
-    const latestTopSet = latest.sets.reduce((best, set) => 
+    const latestTopSet = latest.sets.reduce((best, set) =>
       set.weight > best.weight ? set : best
-    , latest.sets[0]);
+      , latest.sets[0]);
 
-    const previousTopSet = previous.sets.reduce((best, set) => 
+    const previousTopSet = previous.sets.reduce((best, set) =>
       set.weight > best.weight ? set : best
-    , previous.sets[0]);
+      , previous.sets[0]);
 
     // Check if weight is stable and reps are being hit
     const weightStable = Math.abs(latestTopSet.weight - previousTopSet.weight) < 5;

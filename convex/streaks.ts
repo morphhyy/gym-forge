@@ -1,7 +1,13 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
-import { requireAuth, getAuthUserId } from "./auth";
-import { Id } from "./_generated/dataModel";
+import { mutation, query } from "./_generated/server";
+import { getAuthUserId, requireAuth } from "./auth";
+import {
+  computePlannedStreak,
+  getPreviousWorkoutDate,
+  getTodayDateStr,
+  getWorkoutWeekdaysFromActivePlan,
+  isSessionCompletedOnDate
+} from "./lib/plannedStreak";
 
 // Achievement types and their criteria
 const STREAK_ACHIEVEMENTS = [
@@ -69,8 +75,20 @@ export const getStreakData = query({
       (s) => s.completedAt && s.date >= weekStart
     ).length;
 
+    // Get workout weekdays from active plan
+    const workoutWeekdays = await getWorkoutWeekdaysFromActivePlan(ctx, userId);
+    const today = getTodayDateStr();
+
+    let currentStreak = user.currentStreak ?? 0;
+
+    // If user has an active plan with workout days, compute plan-aware streak
+    if (workoutWeekdays && workoutWeekdays.size > 0) {
+      const streakResult = await computePlannedStreak(ctx, userId, today, workoutWeekdays);
+      currentStreak = streakResult.streak;
+    }
+
     return {
-      currentStreak: user.currentStreak ?? 0,
+      currentStreak,
       longestStreak: user.longestStreak ?? 0,
       lastWorkoutDate: user.lastWorkoutDate ?? null,
       weeklyGoal: user.weeklyGoal ?? 3,
@@ -217,6 +235,7 @@ export const getUserAchievements = query({
 });
 
 // Check if streak is at risk (hasn't worked out today and streak > 0)
+// Now plan-aware: only shows "at_risk" on workout days, rest days never break streak
 export const getStreakStatus = query({
   args: {},
   handler: async (ctx) => {
@@ -230,23 +249,63 @@ export const getStreakStatus = query({
 
     if (!user) return null;
 
-    const currentStreak = user.currentStreak ?? 0;
-    const lastWorkoutDate = user.lastWorkoutDate;
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayDateStr();
 
-    if (currentStreak === 0) {
+    // Get workout weekdays from active plan
+    const workoutWeekdays = await getWorkoutWeekdaysFromActivePlan(ctx, userId);
+
+    // If no active plan, fall back to simple calendar-based logic
+    if (!workoutWeekdays || workoutWeekdays.size === 0) {
+      const currentStreak = user.currentStreak ?? 0;
+      const lastWorkoutDate = user.lastWorkoutDate;
+
+      if (currentStreak === 0) {
+        return { status: "none", streak: 0 };
+      }
+
+      if (lastWorkoutDate === today) {
+        return { status: "completed", streak: currentStreak };
+      }
+
+      if (lastWorkoutDate && isYesterday(lastWorkoutDate)) {
+        return { status: "at_risk", streak: currentStreak };
+      }
+
+      return { status: "broken", streak: 0 };
+    }
+
+    // Plan-aware streak status
+    const streakResult = await computePlannedStreak(ctx, userId, today, workoutWeekdays);
+    const { streak, completedToday, isWorkoutToday } = streakResult;
+
+    if (streak === 0 && !isWorkoutToday) {
+      // Rest day with no streak - check if the last workout day was missed
+      const lastWorkoutDay = getPreviousWorkoutDate(today, workoutWeekdays);
+      if (lastWorkoutDay) {
+        const wasCompleted = await isSessionCompletedOnDate(ctx, userId, lastWorkoutDay);
+        if (!wasCompleted) {
+          return { status: "broken", streak: 0 };
+        }
+      }
       return { status: "none", streak: 0 };
     }
 
-    if (lastWorkoutDate === today) {
-      return { status: "completed", streak: currentStreak };
+    if (isWorkoutToday) {
+      if (completedToday) {
+        return { status: "completed", streak };
+      } else if (streak > 0) {
+        // Today is a workout day, not done yet, but has an existing streak
+        return { status: "at_risk", streak };
+      } else {
+        // No streak, workout day not completed
+        return { status: "none", streak: 0 };
+      }
+    } else {
+      // Rest day - streak is safe, just report the current streak
+      if (streak > 0) {
+        return { status: "completed", streak };
+      }
+      return { status: "none", streak: 0 };
     }
-
-    if (lastWorkoutDate && isYesterday(lastWorkoutDate)) {
-      return { status: "at_risk", streak: currentStreak };
-    }
-
-    // Streak is already broken
-    return { status: "broken", streak: 0 };
   },
 });
