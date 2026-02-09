@@ -11,6 +11,7 @@ import {
   TrendingUp,
   AlertCircle,
   Trophy,
+  Scale,
 } from "lucide-react";
 import { format } from "date-fns";
 import { StreakBadge } from "@/app/components/streak-badge";
@@ -25,6 +26,7 @@ export default function DashboardPage() {
   const streakData = useQuery(api.streaks.getStreakData);
   const streakStatus = useQuery(api.streaks.getStreakStatus);
   const userAchievements = useQuery(api.streaks.getUserAchievements);
+  const latestWeight = useQuery(api.bodyWeight.getLatestWeight);
 
   const weightUnit = userData?.units || "kg";
 
@@ -161,6 +163,22 @@ export default function DashboardPage() {
           <h3 className="font-semibold text-lg mb-1">View Progress</h3>
           <p className="text-muted-foreground text-sm">
             Charts and analytics for every lift
+          </p>
+        </Link>
+
+        {/* Body Weight Card */}
+        <Link href="/body-weight" className="card card-hover group">
+          <div className="flex items-start justify-between mb-4">
+            <div className="w-12 h-12 bg-purple-500/15 rounded-xl flex items-center justify-center">
+              <Scale className="w-6 h-6 text-purple-500" />
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted group-hover:text-foreground transition-colors" />
+          </div>
+          <h3 className="font-semibold text-lg mb-1">Body Weight</h3>
+          <p className="text-muted-foreground text-sm">
+            {latestWeight
+              ? `${latestWeight.weight} ${weightUnit} — ${format(new Date(latestWeight.date + "T00:00:00"), "MMM d")}`
+              : "Track your body weight"}
           </p>
         </Link>
       </div>

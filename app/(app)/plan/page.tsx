@@ -18,15 +18,18 @@ import {
   Edit2,
   Sparkles,
   Share2,
+  Link2,
 } from "lucide-react";
 import { getDayName, getShortDayName } from "@/app/lib/utils";
 import { toast } from "sonner";
+import { nanoid } from "nanoid";
 
 type PlanExercise = {
   exerciseId: Id<"exercises">;
   exerciseName: string;
   order: number;
   sets: { repsTarget: number; notes?: string }[];
+  supersetGroup?: string;
 };
 
 type PlanDay = {
@@ -94,6 +97,7 @@ export default function PlanPage() {
               exerciseId: Id<"exercises">;
               exercise?: { name: string } | null;
               sets: { repsTarget: number; notes?: string }[];
+              supersetGroup?: string;
             }[];
           }) => ({
             weekday: day.weekday,
@@ -104,6 +108,7 @@ export default function PlanPage() {
                   exerciseId: Id<"exercises">;
                   exercise?: { name: string } | null;
                   sets: { repsTarget: number; notes?: string }[];
+                  supersetGroup?: string;
                 },
                 idx: number
               ) => ({
@@ -111,6 +116,7 @@ export default function PlanPage() {
                 exerciseName: e.exercise?.name ?? "Unknown",
                 order: idx,
                 sets: e.sets,
+                supersetGroup: e.supersetGroup,
               })
             ),
           })
@@ -206,16 +212,63 @@ export default function PlanPage() {
 
   const removeExercise = (dayIndex: number, exerciseIndex: number) => {
     setDays((prev) =>
-      prev.map((day, i) =>
-        i === dayIndex
-          ? {
+      prev.map((day, i) => {
+        if (i !== dayIndex) return day;
+        const removedExercise = day.exercises[exerciseIndex];
+        const remaining = day.exercises
+          .filter((_, j) => j !== exerciseIndex)
+          .map((e, idx) => ({ ...e, order: idx }));
+        // If removed exercise was in a superset, check if only one remains in that group
+        if (removedExercise?.supersetGroup) {
+          const groupId = removedExercise.supersetGroup;
+          const groupMembers = remaining.filter((e) => e.supersetGroup === groupId);
+          if (groupMembers.length === 1) {
+            // Only one left in group - remove its supersetGroup
+            return {
               ...day,
-              exercises: day.exercises
-                .filter((_, j) => j !== exerciseIndex)
-                .map((e, idx) => ({ ...e, order: idx })),
-            }
-          : day
-      )
+              exercises: remaining.map((e) =>
+                e.supersetGroup === groupId ? { ...e, supersetGroup: undefined } : e
+              ),
+            };
+          }
+        }
+        return { ...day, exercises: remaining };
+      })
+    );
+  };
+
+  const toggleSuperset = (dayIndex: number, exIndex: number) => {
+    setDays((prev) =>
+      prev.map((day, i) => {
+        if (i !== dayIndex) return day;
+        const exercises = [...day.exercises];
+        const current = exercises[exIndex];
+        const next = exercises[exIndex + 1];
+        if (!next) return day; // No next exercise to pair with
+
+        if (current.supersetGroup && current.supersetGroup === next.supersetGroup) {
+          // Already paired - remove superset
+          const groupId = current.supersetGroup;
+          const groupMembers = exercises.filter((e) => e.supersetGroup === groupId);
+          if (groupMembers.length === 2) {
+            // Only these two - clear both
+            return {
+              ...day,
+              exercises: exercises.map((e) =>
+                e.supersetGroup === groupId ? { ...e, supersetGroup: undefined } : e
+              ),
+            };
+          }
+          // More than two - just remove current from the group
+          exercises[exIndex] = { ...current, supersetGroup: undefined };
+        } else {
+          // Create superset - assign same group ID
+          const groupId = next.supersetGroup || current.supersetGroup || nanoid(6);
+          exercises[exIndex] = { ...current, supersetGroup: groupId };
+          exercises[exIndex + 1] = { ...next, supersetGroup: groupId };
+        }
+        return { ...day, exercises };
+      })
     );
   };
 
@@ -259,6 +312,7 @@ export default function PlanPage() {
             exerciseId: e.exerciseId,
             order: e.order,
             sets: e.sets,
+            supersetGroup: e.supersetGroup,
           })),
         })),
       };
@@ -431,22 +485,39 @@ export default function PlanPage() {
                           _id: string;
                           exercise?: { name: string } | null;
                           sets: { repsTarget: number }[];
+                          supersetGroup?: string;
                         },
                         idx: number
-                      ) => (
-                        <div
-                          key={exercise._id}
-                          className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0"
-                        >
-                          <span className="text-sm">
-                            {exercise.exercise?.name ?? "Unknown"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {exercise.sets.length}×
-                            {exercise.sets[0]?.repsTarget}
-                          </span>
-                        </div>
-                      )
+                      ) => {
+                        const isInSuperset = !!exercise.supersetGroup;
+                        const isFirstInGroup =
+                          isInSuperset &&
+                          (idx === 0 ||
+                            (day.exercises[idx - 1] as { supersetGroup?: string })?.supersetGroup !== exercise.supersetGroup);
+                        return (
+                          <div key={exercise._id}>
+                            {isFirstInGroup && (
+                              <div className="flex items-center gap-1.5 pt-1">
+                                <Link2 className="w-3 h-3 text-primary" />
+                                <span className="text-xs font-medium text-primary">Superset</span>
+                              </div>
+                            )}
+                            <div
+                              className={`flex items-center justify-between py-1.5 border-b border-border/50 last:border-0 ${
+                                isInSuperset ? "pl-4 border-l-2 border-l-primary" : ""
+                              }`}
+                            >
+                              <span className="text-sm">
+                                {exercise.exercise?.name ?? "Unknown"}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {exercise.sets.length}×
+                                {exercise.sets[0]?.repsTarget}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
                     )}
                   </div>
                 ) : (
@@ -708,11 +779,32 @@ export default function PlanPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {day.exercises.map((exercise, exIndex) => (
+                      {day.exercises.map((exercise, exIndex) => {
+                        const isInSuperset = !!exercise.supersetGroup;
+                        const isFirstInGroup =
+                          isInSuperset &&
+                          (exIndex === 0 ||
+                            day.exercises[exIndex - 1]?.supersetGroup !== exercise.supersetGroup);
+                        const isLastInGroup =
+                          isInSuperset &&
+                          (exIndex === day.exercises.length - 1 ||
+                            day.exercises[exIndex + 1]?.supersetGroup !== exercise.supersetGroup);
+                        return (
                         <div
                           key={`${exercise.exerciseId}-${exIndex}`}
-                          className="bg-background rounded-lg p-4 border border-border"
+                          className={`bg-background rounded-lg p-4 border border-border ${
+                            isInSuperset ? "border-l-2 border-l-primary" : ""
+                          } ${isInSuperset && !isLastInGroup ? "mb-0 rounded-b-none" : ""} ${
+                            isInSuperset && !isFirstInGroup ? "mt-0 rounded-t-none border-t-0" : ""
+                          }`}
                         >
+                          {/* Superset label on first exercise in group */}
+                          {isFirstInGroup && (
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <Link2 className="w-3.5 h-3.5 text-primary" />
+                              <span className="text-xs font-medium text-primary">Superset</span>
+                            </div>
+                          )}
                           {/* Exercise Header */}
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
@@ -721,12 +813,27 @@ export default function PlanPage() {
                                 {exercise.exerciseName}
                               </span>
                             </div>
-                            <button
-                              onClick={() => removeExercise(dayIndex, exIndex)}
-                              className="btn btn-ghost p-1.5 text-muted hover:text-danger hover:bg-danger/10"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              {exIndex < day.exercises.length - 1 && (
+                                <button
+                                  onClick={() => toggleSuperset(dayIndex, exIndex)}
+                                  className={`btn btn-ghost p-1.5 ${
+                                    isInSuperset && exercise.supersetGroup === day.exercises[exIndex + 1]?.supersetGroup
+                                      ? "text-primary bg-primary/10"
+                                      : "text-muted"
+                                  }`}
+                                  title="Toggle superset with next exercise"
+                                >
+                                  <Link2 className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => removeExercise(dayIndex, exIndex)}
+                                className="btn btn-ghost p-1.5 text-muted hover:text-danger hover:bg-danger/10"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
 
                           {/* Sets Section */}
@@ -802,7 +909,8 @@ export default function PlanPage() {
                             </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

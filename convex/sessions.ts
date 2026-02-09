@@ -356,6 +356,72 @@ export const getLastWeightForExercise = query({
   },
 });
 
+// Get sessions for a specific month (for calendar view)
+export const getSessionsForMonth = query({
+  args: {
+    year: v.number(),
+    month: v.number(), // 1-12
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    // Calculate date range for the month
+    const startDate = `${args.year}-${String(args.month).padStart(2, "0")}-01`;
+    const lastDay = new Date(args.year, args.month, 0).getDate();
+    const endDate = `${args.year}-${String(args.month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) =>
+        q.and(
+          q.gte(q.field("date"), startDate),
+          q.lte(q.field("date"), endDate)
+        )
+      )
+      .collect();
+
+    // Enrich each session with summary data
+    const enriched = await Promise.all(
+      sessions.map(async (session) => {
+        const sets = await ctx.db
+          .query("sessionSets")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .collect();
+
+        const exerciseMap = new Map<string, { name: string; setCount: number }>();
+        let totalVolume = 0;
+
+        for (const set of sets) {
+          totalVolume += set.weight * set.repsActual;
+          if (!exerciseMap.has(set.exerciseId)) {
+            const exercise = await ctx.db.get(set.exerciseId);
+            exerciseMap.set(set.exerciseId, {
+              name: exercise?.name ?? "Unknown",
+              setCount: 0,
+            });
+          }
+          const entry = exerciseMap.get(set.exerciseId)!;
+          entry.setCount += 1;
+        }
+
+        return {
+          _id: session._id,
+          date: session.date,
+          completedAt: session.completedAt,
+          totalSets: sets.length,
+          totalVolume,
+          exerciseCount: exerciseMap.size,
+          exercises: Array.from(exerciseMap.values()),
+        };
+      })
+    );
+
+    return enriched;
+  },
+});
+
 // Get last weights for multiple exercises (for pre-filling workout log)
 export const getLastWeightsForExercises = query({
   args: { exerciseIds: v.array(v.id("exercises")) },

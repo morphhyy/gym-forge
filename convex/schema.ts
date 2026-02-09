@@ -51,10 +51,10 @@ export default defineSchema({
     .index("by_user_active", ["userId", "active"])
     .index("by_share_token", ["shareToken"]),
 
-  // Plan days (Mon-Sun for each plan)
+  // Plan days (Sun-Sat for each plan)
   planDays: defineTable({
     planId: v.id("plans"),
-    weekday: v.number(), // 0=Monday, 6=Sunday
+    weekday: v.number(), // 0=Sunday, 6=Saturday (matches JS Date.getDay())
     name: v.optional(v.string()), // e.g., "Push Day"
     createdAt: v.number(),
   }).index("by_plan", ["planId"]),
@@ -71,6 +71,7 @@ export default defineSchema({
       })
     ),
     restSeconds: v.optional(v.number()), // Rest time between sets
+    supersetGroup: v.optional(v.string()), // Exercises with same value are a superset
     createdAt: v.number(),
   }).index("by_plan_day", ["planDayId"]),
 
@@ -138,6 +139,17 @@ export default defineSchema({
     userAgent: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_ip_hash", ["ipHash"]),
+
+  // Body weight tracking
+  bodyWeights: defineTable({
+    userId: v.string(),
+    date: v.string(), // ISO YYYY-MM-DD
+    weight: v.number(),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_date", ["userId", "date"]),
 
   // Rate limiting tracker
   rateLimits: defineTable({

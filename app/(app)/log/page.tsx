@@ -17,6 +17,7 @@ import {
   Flame,
   TrendingUp,
   TrendingDown,
+  Link2,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -229,6 +230,44 @@ function LogPageContent() {
     }
   };
 
+  // Group exercises by superset for display
+  type TemplateExercise = {
+    _id: string;
+    exercise?: {
+      _id: Id<"exercises">;
+      name: string;
+      muscleGroup?: string;
+      equipment?: string;
+    } | null;
+    sets: { repsTarget: number }[];
+    supersetGroup?: string;
+  };
+
+  const groupedExercises = useMemo(() => {
+    if (!todayTemplate?.exercises) return [];
+    const exercises = todayTemplate.exercises as TemplateExercise[];
+    const groups: { supersetGroup?: string; exercises: TemplateExercise[] }[] = [];
+    let currentGroup: TemplateExercise[] = [];
+    let currentGroupId: string | undefined = undefined;
+
+    for (const ex of exercises) {
+      const exGroup = ex.supersetGroup;
+      if (exGroup && exGroup === currentGroupId) {
+        currentGroup.push(ex);
+      } else {
+        if (currentGroup.length > 0) {
+          groups.push({ supersetGroup: currentGroupId, exercises: currentGroup });
+        }
+        currentGroup = [ex];
+        currentGroupId = exGroup;
+      }
+    }
+    if (currentGroup.length > 0) {
+      groups.push({ supersetGroup: currentGroupId, exercises: currentGroup });
+    }
+    return groups;
+  }, [todayTemplate?.exercises]);
+
   const isToday = selectedDate === format(new Date(), "yyyy-MM-dd");
   const isCompleted = sessionData?.completedAt != null;
 
@@ -362,29 +401,18 @@ function LogPageContent() {
         <>
           {/* Exercise List */}
           <div className="space-y-4">
-            {todayTemplate.exercises.map(
-              (
-                planExercise: {
-                  _id: string;
-                  exercise?: {
-                    _id: Id<"exercises">;
-                    name: string;
-                    muscleGroup?: string;
-                    equipment?: string;
-                  } | null;
-                  sets: { repsTarget: number }[];
-                },
+            {groupedExercises.map((group, groupIndex) => {
+              const isSuperset = !!group.supersetGroup && group.exercises.length > 1;
+
+              const renderExercise = (
+                planExercise: TemplateExercise,
                 exIndex: number
               ) => {
                 const exercise = planExercise.exercise;
                 if (!exercise) return null;
 
                 return (
-                  <div
-                    key={planExercise._id}
-                    className="card"
-                    style={{ animationDelay: `${exIndex * 50}ms` }}
-                  >
+                  <div key={planExercise._id}>
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-10 h-10 bg-primary-muted rounded-xl flex items-center justify-center">
                         <Dumbbell className="w-5 h-5 text-primary" />
@@ -540,8 +568,36 @@ function LogPageContent() {
                     </div>
                   </div>
                 );
+              };
+
+              if (isSuperset) {
+                return (
+                  <div
+                    key={`group-${groupIndex}`}
+                    className="card border-l-2 border-l-primary"
+                    style={{ animationDelay: `${groupIndex * 50}ms` }}
+                  >
+                    <div className="flex items-center gap-1.5 mb-4">
+                      <Link2 className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium text-primary">Superset</span>
+                    </div>
+                    <div className="divide-y divide-border/50">
+                      {group.exercises.map((ex, i) => renderExercise(ex, i))}
+                    </div>
+                  </div>
+                );
               }
-            )}
+
+              return (
+                <div
+                  key={`group-${groupIndex}`}
+                  className="card"
+                  style={{ animationDelay: `${groupIndex * 50}ms` }}
+                >
+                  {group.exercises.map((ex, i) => renderExercise(ex as typeof group.exercises[0], i))}
+                </div>
+              );
+            })}
           </div>
 
           {/* Complete Workout Button */}

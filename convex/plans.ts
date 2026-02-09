@@ -183,6 +183,7 @@ export const createPlan = mutation({
                 notes: v.optional(v.string()),
               })
             ),
+            supersetGroup: v.optional(v.string()),
           })
         ),
       })
@@ -241,6 +242,7 @@ export const createPlan = mutation({
           exerciseId: exercise.exerciseId,
           order: exercise.order,
           sets: exercise.sets,
+          supersetGroup: exercise.supersetGroup,
           createdAt: Date.now(),
         });
       }
@@ -279,6 +281,7 @@ export const updatePlan = mutation({
                 notes: v.optional(v.string()),
               })
             ),
+            supersetGroup: v.optional(v.string()),
           })
         ),
       })
@@ -330,6 +333,7 @@ export const updatePlan = mutation({
           exerciseId: exercise.exerciseId,
           order: exercise.order,
           sets: exercise.sets,
+          supersetGroup: exercise.supersetGroup,
           createdAt: Date.now(),
         });
       }
@@ -596,6 +600,7 @@ export const copySharedPlan = mutation({
             exerciseId: exercise.exerciseId,
             order: exercise.order,
             sets: exercise.sets,
+            supersetGroup: exercise.supersetGroup,
             createdAt: Date.now(),
           });
         }

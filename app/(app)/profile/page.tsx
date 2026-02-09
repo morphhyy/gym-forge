@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useUser, useClerk } from "@clerk/nextjs";
-import { User, Settings, LogOut, Save, Check, Target } from "lucide-react";
+import { User, Settings, LogOut, Save, Check, Target, Scale, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function ProfilePage() {
   const { user: clerkUser } = useUser();
@@ -221,6 +222,22 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Body Weight Tracker */}
+      <Link href="/body-weight" className="card card-hover flex items-center justify-between group">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-purple-500/15 rounded-xl flex items-center justify-center">
+            <Scale className="w-6 h-6 text-purple-500" />
+          </div>
+          <div>
+            <h3 className="font-semibold">Body Weight Tracker</h3>
+            <p className="text-sm text-muted-foreground">
+              Log and track your body weight over time
+            </p>
+          </div>
+        </div>
+        <ChevronRight className="w-5 h-5 text-muted group-hover:text-foreground transition-colors" />
+      </Link>
 
       {/* Danger Zone */}
       <div className="card border-danger/30">

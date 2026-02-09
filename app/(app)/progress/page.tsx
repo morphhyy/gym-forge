@@ -148,13 +148,19 @@ export default function ProgressPage() {
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-          Progress
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Track your strength gains over time
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            Progress
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Track your strength gains over time
+          </p>
+        </div>
+        <Link href="/history" className="btn btn-secondary text-sm">
+          <Calendar className="w-4 h-4" />
+          Calendar
+        </Link>
       </div>
 
       {/* Overview Stats */}
