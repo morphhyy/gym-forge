@@ -1,6 +1,7 @@
 "use client";
 
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { useAction, useMutation } from "convex/react";
 import { Camera, Check, Loader2, Lock, RotateCcw, Utensils } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
@@ -111,7 +112,7 @@ export function AddFoodDialog({
   });
   const [mealType, setMealType] = useState<MealType>(getDefaultMealType);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [storageId, setStorageId] = useState<string | null>(null);
+  const [storageId, setStorageId] = useState<Id<"_storage"> | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);

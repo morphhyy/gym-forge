@@ -113,7 +113,7 @@ GUIDELINES:
         {
           role: "user",
           content: [
-            { type: "input_image", image_url: imageUrl },
+            { type: "input_image", image_url: imageUrl, detail: "auto" },
             {
               type: "input_text",
               text: "Analyze this food image and estimate the nutritional content per serving.",
