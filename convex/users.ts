@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { requireAuth, getAuthUserId } from "./auth";
 
 const MAX_FREE_AI_USES = 1;
@@ -79,6 +79,27 @@ export const ensureUser = mutation({
     }
 
     return existingUser._id;
+  },
+});
+
+// Admin-only: set a user's paid status (call from Convex dashboard or internal functions)
+export const setUserPaidStatus = internalMutation({
+  args: {
+    clerkUserId: v.string(),
+    isPaidUser: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", args.clerkUserId))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    await ctx.db.patch(user._id, { isPaidUser: args.isPaidUser });
+    return user._id;
   },
 });
 

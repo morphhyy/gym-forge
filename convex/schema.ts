@@ -19,6 +19,7 @@ export default defineSchema({
     defaultRestSeconds: v.optional(v.number()),
     restTimerSound: v.optional(v.boolean()),
     restTimerVibrate: v.optional(v.boolean()),
+    isPaidUser: v.optional(v.boolean()),
     createdAt: v.number(),
   })
     .index("by_clerk_id", ["clerkUserId"])
@@ -150,6 +151,44 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_date", ["userId", "date"]),
+
+  // Food nutrition entries (from AI image analysis or manual)
+  foodEntries: defineTable({
+    userId: v.string(),
+    date: v.string(), // ISO YYYY-MM-DD
+    mealType: v.union(
+      v.literal("breakfast"),
+      v.literal("lunch"),
+      v.literal("dinner"),
+      v.literal("snack")
+    ),
+    foodName: v.string(),
+    description: v.optional(v.string()),
+    servingSize: v.optional(v.string()),
+    imageStorageId: v.optional(v.id("_storage")),
+    calories: v.number(),
+    protein: v.number(),
+    carbs: v.number(),
+    fat: v.number(),
+    fiber: v.optional(v.number()),
+    sugar: v.optional(v.number()),
+    aiAnalyzed: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_date", ["userId", "date"]),
+
+  // Daily nutrition goals
+  nutritionGoals: defineTable({
+    userId: v.string(),
+    calories: v.number(),
+    protein: v.number(),
+    carbs: v.number(),
+    fat: v.number(),
+    fiber: v.optional(v.number()),
+    sugar: v.optional(v.number()),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
 
   // Rate limiting tracker
   rateLimits: defineTable({

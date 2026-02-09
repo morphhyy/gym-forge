@@ -34,29 +34,34 @@ export function formatLargeNumber(num: number): string {
   return num.toString();
 }
 
-// Get day name from weekday number (0=Monday, 6=Sunday - Monday-based)
+// Get day name from weekday number (0=Sunday, 6=Saturday)
 export function getDayName(weekday: number): string {
   const days = [
+    "Sunday",
     "Monday",
     "Tuesday",
     "Wednesday",
     "Thursday",
     "Friday",
     "Saturday",
-    "Sunday",
   ];
   return days[weekday] ?? "Unknown";
 }
 
-// Get short day name (0=Monday, 6=Sunday - Monday-based)
+// Get short day name (0=Sunday, 6=Saturday)
 export function getShortDayName(weekday: number): string {
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   return days[weekday] ?? "???";
 }
 
-// Convert JS weekday (0=Sunday) to Monday-based (0=Monday, 6=Sunday)
+// Convert JS weekday (0=Sunday) to app weekday - identity function since we use same system
+export function jsWeekdayToAppWeekday(jsWeekday: number): number {
+  return jsWeekday;
+}
+
+// Deprecated: kept for backwards compatibility, use jsWeekdayToAppWeekday instead
 export function jsWeekdayToMonday(jsWeekday: number): number {
-  return jsWeekday === 0 ? 6 : jsWeekday - 1;
+  return jsWeekday;
 }
 
 // Generate progression suggestion

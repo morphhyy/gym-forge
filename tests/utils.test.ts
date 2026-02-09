@@ -75,10 +75,14 @@ describe("formatLargeNumber", () => {
 });
 
 describe("getDayName", () => {
-  it("returns correct day names", () => {
-    expect(getDayName(0)).toBe("Monday");
-    expect(getDayName(4)).toBe("Friday");
-    expect(getDayName(6)).toBe("Sunday");
+  it("returns correct day names (0=Sunday, 6=Saturday)", () => {
+    expect(getDayName(0)).toBe("Sunday");
+    expect(getDayName(1)).toBe("Monday");
+    expect(getDayName(2)).toBe("Tuesday");
+    expect(getDayName(3)).toBe("Wednesday");
+    expect(getDayName(4)).toBe("Thursday");
+    expect(getDayName(5)).toBe("Friday");
+    expect(getDayName(6)).toBe("Saturday");
   });
 
   it("returns Unknown for invalid weekday", () => {
@@ -88,24 +92,23 @@ describe("getDayName", () => {
 });
 
 describe("getShortDayName", () => {
-  it("returns correct short day names", () => {
-    expect(getShortDayName(0)).toBe("Mon");
-    expect(getShortDayName(4)).toBe("Fri");
-    expect(getShortDayName(6)).toBe("Sun");
+  it("returns correct short day names (0=Sunday, 6=Saturday)", () => {
+    expect(getShortDayName(0)).toBe("Sun");
+    expect(getShortDayName(1)).toBe("Mon");
+    expect(getShortDayName(2)).toBe("Tue");
+    expect(getShortDayName(3)).toBe("Wed");
+    expect(getShortDayName(4)).toBe("Thu");
+    expect(getShortDayName(5)).toBe("Fri");
+    expect(getShortDayName(6)).toBe("Sat");
   });
 });
 
 describe("jsWeekdayToMonday", () => {
-  it("converts JS Sunday (0) to our Sunday (6)", () => {
-    expect(jsWeekdayToMonday(0)).toBe(6);
-  });
-
-  it("converts JS Monday (1) to our Monday (0)", () => {
-    expect(jsWeekdayToMonday(1)).toBe(0);
-  });
-
-  it("converts JS Friday (5) to our Friday (4)", () => {
-    expect(jsWeekdayToMonday(5)).toBe(4);
+  it("returns same value (identity function - JS weekday matches our system)", () => {
+    expect(jsWeekdayToMonday(0)).toBe(0); // Sunday
+    expect(jsWeekdayToMonday(1)).toBe(1); // Monday
+    expect(jsWeekdayToMonday(5)).toBe(5); // Friday
+    expect(jsWeekdayToMonday(6)).toBe(6); // Saturday
   });
 });
 
