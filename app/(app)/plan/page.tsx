@@ -7,6 +7,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { ExerciseSelector } from "@/app/components/exercise-selector";
 import { AIPlanGenerator } from "@/app/components/ai-plan-generator";
 import { SharePlanDialog } from "@/app/components/share-plan-dialog";
+import { PlanTemplates } from "@/app/components/plan-templates";
 import {
   Plus,
   Trash2,
@@ -19,6 +20,7 @@ import {
   Sparkles,
   Share2,
   Link2,
+  LayoutTemplate,
 } from "lucide-react";
 import { getDayName, getShortDayName } from "@/app/lib/utils";
 import { toast } from "sonner";
@@ -57,6 +59,7 @@ export default function PlanPage() {
   >(null);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<Id<"plans"> | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -170,6 +173,34 @@ export default function PlanPage() {
     setIsEditing(true);
     setExpandedDay(0);
     setIsAIGenerated(true);
+    setEditingPlanId(null);
+  };
+
+  const handleTemplateSelected = (plan: {
+    planName: string;
+    days: {
+      weekday: number;
+      name?: string;
+      exercises: {
+        exerciseId: Id<"exercises">;
+        exerciseName: string;
+        order: number;
+        sets: { repsTarget: number }[];
+      }[];
+    }[];
+  }) => {
+    setPlanName(plan.planName);
+    setDays(
+      plan.days.map((day) => ({
+        weekday: day.weekday,
+        name: day.name,
+        exercises: day.exercises,
+      }))
+    );
+    setShowTemplates(false);
+    setIsEditing(true);
+    setExpandedDay(0);
+    setIsAIGenerated(false);
     setEditingPlanId(null);
   };
 
@@ -381,6 +412,13 @@ export default function PlanPage() {
                 Create Manually
               </button>
               <button
+                onClick={() => setShowTemplates(true)}
+                className="btn btn-secondary"
+              >
+                <LayoutTemplate className="w-4 h-4" />
+                Use Template
+              </button>
+              <button
                 onClick={() => setShowAIGenerator(true)}
                 disabled={aiUsage?.isLimitReached}
                 className="btn btn-ai"
@@ -390,6 +428,13 @@ export default function PlanPage() {
               </button>
             </div>
           </div>
+
+          {/* Plan Templates Modal */}
+          <PlanTemplates
+            open={showTemplates}
+            onOpenChange={setShowTemplates}
+            onSelectTemplate={handleTemplateSelected}
+          />
 
           {/* AI Plan Generator Modal */}
           <AIPlanGenerator
@@ -412,7 +457,7 @@ export default function PlanPage() {
               Created {new Date(activePlan.createdAt).toLocaleDateString()}
             </p>
           </div>
-          <div className="grid grid-cols-4 sm:flex gap-2 sm:gap-3 w-full sm:w-auto">
+          <div className="grid grid-cols-5 sm:flex gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={startEditing}
               className="btn btn-secondary text-sm sm:text-base"
@@ -426,6 +471,13 @@ export default function PlanPage() {
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">New</span>
+            </button>
+            <button
+              onClick={() => setShowTemplates(true)}
+              className="btn btn-secondary text-sm sm:text-base"
+            >
+              <LayoutTemplate className="w-4 h-4" />
+              <span className="hidden sm:inline">Template</span>
             </button>
             <button
               onClick={() => setShowShareDialog(true)}
@@ -635,6 +687,13 @@ export default function PlanPage() {
             </div>
           </div>
         )}
+
+        {/* Plan Templates Modal */}
+        <PlanTemplates
+          open={showTemplates}
+          onOpenChange={setShowTemplates}
+          onSelectTemplate={handleTemplateSelected}
+        />
 
         {/* AI Plan Generator Modal */}
         <AIPlanGenerator
