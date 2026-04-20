@@ -48,7 +48,7 @@ const TEMPLATES: Template[] = [
     level: "Intermediate - Advanced",
     days: [
       {
-        weekday: 1,
+        weekday: 0,
         name: "Chest & Back A",
         exercises: [
           { name: "Bench Press", sets: 4, reps: 10 },
@@ -60,7 +60,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 2,
+        weekday: 1,
         name: "Shoulders & Arms A",
         exercises: [
           { name: "Dumbbell Shoulder Press", sets: 4, reps: 10 },
@@ -72,7 +72,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 3,
+        weekday: 2,
         name: "Legs A",
         exercises: [
           { name: "Squat", sets: 4, reps: 10 },
@@ -84,7 +84,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 4,
+        weekday: 3,
         name: "Chest & Back B",
         exercises: [
           { name: "Deadlift", sets: 3, reps: 8 },
@@ -96,7 +96,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 5,
+        weekday: 4,
         name: "Shoulders & Arms B",
         exercises: [
           { name: "Overhead Press", sets: 4, reps: 10 },
@@ -108,7 +108,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 6,
+        weekday: 5,
         name: "Legs B",
         exercises: [
           { name: "Leg Press", sets: 4, reps: 12 },
@@ -129,7 +129,7 @@ const TEMPLATES: Template[] = [
     level: "Intermediate",
     days: [
       {
-        weekday: 1,
+        weekday: 0,
         name: "Push",
         exercises: [
           { name: "Bench Press", sets: 3, reps: 8 },
@@ -140,7 +140,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 2,
+        weekday: 1,
         name: "Pull",
         exercises: [
           { name: "Barbell Row", sets: 3, reps: 8 },
@@ -151,7 +151,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 3,
+        weekday: 2,
         name: "Legs",
         exercises: [
           { name: "Squat", sets: 3, reps: 8 },
@@ -162,7 +162,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 4,
+        weekday: 3,
         name: "Upper",
         exercises: [
           { name: "Pull-Up", sets: 3, reps: 8 },
@@ -173,7 +173,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 5,
+        weekday: 4,
         name: "Lower",
         exercises: [
           { name: "Leg Press", sets: 3, reps: 10 },
@@ -193,7 +193,7 @@ const TEMPLATES: Template[] = [
     level: "Intermediate",
     days: [
       {
-        weekday: 1,
+        weekday: 0,
         name: "Upper Power",
         exercises: [
           { name: "Bench Press", sets: 4, reps: 5 },
@@ -206,7 +206,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 2,
+        weekday: 1,
         name: "Lower Power",
         exercises: [
           { name: "Squat", sets: 4, reps: 5 },
@@ -217,7 +217,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 4,
+        weekday: 3,
         name: "Upper Hypertrophy",
         exercises: [
           { name: "Incline Bench Press", sets: 4, reps: 10 },
@@ -230,7 +230,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 5,
+        weekday: 4,
         name: "Lower Hypertrophy",
         exercises: [
           { name: "Front Squat", sets: 4, reps: 10 },
@@ -250,7 +250,7 @@ const TEMPLATES: Template[] = [
     level: "Beginner",
     days: [
       {
-        weekday: 1,
+        weekday: 0,
         name: "Full Body A",
         exercises: [
           { name: "Squat", sets: 4, reps: 8 },
@@ -262,7 +262,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 3,
+        weekday: 2,
         name: "Full Body B",
         exercises: [
           { name: "Deadlift", sets: 4, reps: 6 },
@@ -274,7 +274,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 5,
+        weekday: 4,
         name: "Full Body C",
         exercises: [
           { name: "Front Squat", sets: 3, reps: 8 },
@@ -295,7 +295,7 @@ const TEMPLATES: Template[] = [
     level: "Beginner - Intermediate",
     days: [
       {
-        weekday: 1,
+        weekday: 0,
         name: "Glutes & Legs (Strength)",
         exercises: [
           { name: "Squat", sets: 4, reps: 8 },
@@ -307,7 +307,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 2,
+        weekday: 1,
         name: "Upper Body",
         exercises: [
           { name: "Dumbbell Bench Press", sets: 3, reps: 10 },
@@ -319,7 +319,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 4,
+        weekday: 3,
         name: "Glutes & Legs (Hypertrophy)",
         exercises: [
           { name: "Leg Press", sets: 4, reps: 12 },
@@ -331,7 +331,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 5,
+        weekday: 4,
         name: "Upper Body & Core",
         exercises: [
           { name: "Incline Dumbbell Press", sets: 3, reps: 10 },
@@ -352,7 +352,7 @@ const TEMPLATES: Template[] = [
     level: "Intermediate",
     days: [
       {
-        weekday: 1,
+        weekday: 0,
         name: "Glutes & Hamstrings",
         exercises: [
           { name: "Romanian Deadlift", sets: 4, reps: 10 },
@@ -363,7 +363,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 2,
+        weekday: 1,
         name: "Upper Body Push & Pull",
         exercises: [
           { name: "Bench Press", sets: 3, reps: 10 },
@@ -375,7 +375,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 3,
+        weekday: 2,
         name: "Quads & Glutes",
         exercises: [
           { name: "Squat", sets: 4, reps: 8 },
@@ -386,7 +386,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 5,
+        weekday: 4,
         name: "Upper Body & Core",
         exercises: [
           { name: "Incline Dumbbell Press", sets: 3, reps: 10 },
@@ -398,7 +398,7 @@ const TEMPLATES: Template[] = [
         ],
       },
       {
-        weekday: 6,
+        weekday: 5,
         name: "Glutes & Posterior Chain",
         exercises: [
           { name: "Deadlift", sets: 4, reps: 6 },

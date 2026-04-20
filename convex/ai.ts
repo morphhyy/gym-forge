@@ -111,10 +111,11 @@ ${exerciseList}
 CRITICAL RULES:
 1. Exercise names MUST match EXACTLY as listed above (e.g., "Bench Press" NOT "Barbell Bench Press")
 2. weekday values: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
-3. ONLY include workout days that the user requests - DO NOT add rest days
-4. If user asks for 6-day workout, return exactly 6 workout days with exercises
-5. If user asks for 3-day workout, return exactly 3 workout days with exercises
-6. Every day MUST have at least 3-5 exercises
+3. ALWAYS start the workout week from Sunday (weekday 0). The first workout day should be Sunday, then continue through the week.
+4. ONLY include workout days that the user requests - DO NOT add rest days
+5. If user asks for 6-day workout, return exactly 6 workout days with exercises
+6. If user asks for 3-day workout, return exactly 3 workout days with exercises
+7. Every day MUST have at least 3-5 exercises
 
 PROGRAM DESIGN PRINCIPLES:
 - Compound movements first (squats, deadlifts, bench, rows, overhead press)

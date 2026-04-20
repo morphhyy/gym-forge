@@ -237,10 +237,10 @@ export default function LandingPage() {
                   </div>
                   <div className="space-y-2">
                     {[
-                      "Monday: Push Day - 6 exercises",
-                      "Tuesday: Pull Day - 6 exercises",
-                      "Thursday: Legs - 5 exercises",
-                      "Friday: Upper Body - 6 exercises",
+                      "Sunday: Push Day - 6 exercises",
+                      "Monday: Pull Day - 6 exercises",
+                      "Wednesday: Legs - 5 exercises",
+                      "Thursday: Upper Body - 6 exercises",
                     ].map((day) => (
                       <div key={day} className="flex items-center gap-2 text-sm">
                         <CheckCircle2 className="w-4 h-4 text-primary" />
