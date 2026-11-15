@@ -168,6 +168,7 @@ export const getTodayTemplate = query({
 export const createPlan = mutation({
   args: {
     name: v.string(),
+    // Deprecated / ignored — kept optional so existing callers still validate.
     isAIGenerated: v.optional(v.boolean()),
     days: v.array(
       v.object({
@@ -192,20 +193,9 @@ export const createPlan = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
 
-    // If AI-generated plan, increment usage count (secure server-side increment)
-    if (args.isAIGenerated) {
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
-        .unique();
-
-      if (user) {
-        const currentUsage = user.aiUsageCount ?? 0;
-        await ctx.db.patch(user._id, {
-          aiUsageCount: currentUsage + 1,
-        });
-      }
-    }
+    // NOTE: `isAIGenerated` is intentionally ignored. AI usage is now charged
+    // server-side in ai.generateWorkoutPlan at generation time; trusting a
+    // client flag here allowed the limit to be bypassed by not saving.
 
     // Deactivate all existing plans
     const existingPlans = await ctx.db

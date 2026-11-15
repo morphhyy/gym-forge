@@ -93,7 +93,7 @@ export function AIPlanGenerator({
     setError(null);
 
     try {
-      const plan = await generatePlan({ prompt: prompt.trim(), userId });
+      const plan = await generatePlan({ prompt: prompt.trim() });
       setGeneratedPlan(plan as GeneratedPlan);
     } catch (err) {
       const errorMessage =
@@ -171,10 +171,13 @@ export function AIPlanGenerator({
                     >
                       {aiUsage.isLimitReached
                         ? "Limit Reached"
-                        : `${aiUsage.remaining} of ${aiUsage.limit} free AI plans remaining`}
+                        : aiUsage.isUnlimited
+                          ? "Unlimited AI plans"
+                          : `${aiUsage.remaining} of ${aiUsage.limit} free AI plans remaining`}
                     </p>
-                    {!aiUsage.isLimitReached && (
+                    {!aiUsage.isLimitReached && !aiUsage.isUnlimited && (
                       <p className="text-xs text-muted-foreground mt-0.5">
+                        Each generation (including regenerate) uses one.
                         You&apos;ve used {aiUsage.usageCount} AI generation
                         {aiUsage.usageCount !== 1 ? "s" : ""}
                       </p>
