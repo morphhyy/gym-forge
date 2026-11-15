@@ -7,6 +7,8 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/shared/(.*)",
   "/plans/(.*)",
+  // Precached by the service worker; must be fetchable without a session.
+  "/offline",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
