@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 import { WorkoutProgress } from "@/app/components/workout-progress";
 import { NutritionProgress } from "@/app/components/nutrition-progress";
+import { WeeklyMuscleSets } from "@/app/components/weekly-muscle-sets";
 
 function ProgressTabs() {
   const searchParams = useSearchParams();
@@ -66,7 +67,14 @@ function ProgressTabs() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === "workouts" ? <WorkoutProgress /> : <NutritionProgress />}
+      {activeTab === "workouts" ? (
+        <>
+          <WorkoutProgress />
+          <WeeklyMuscleSets />
+        </>
+      ) : (
+        <NutritionProgress />
+      )}
     </div>
   );
 }

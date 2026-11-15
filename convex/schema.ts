@@ -33,6 +33,12 @@ export default defineSchema({
     isGlobal: v.boolean(),
     userId: v.optional(v.string()), // null for global exercises
     createdAt: v.number(),
+    // Exercise library details (optional; backfilled for global exercises)
+    instructions: v.optional(v.array(v.string())),
+    primaryMuscles: v.optional(v.array(v.string())),
+    secondaryMuscles: v.optional(v.array(v.string())),
+    alternatives: v.optional(v.array(v.string())), // exercise names
+    gifUrl: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_global", ["isGlobal"]),

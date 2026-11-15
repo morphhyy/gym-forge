@@ -1,6 +1,8 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { requireAuth, getAuthUserId } from "./auth";
+import { SEED_EXERCISES } from "./lib/exerciseCatalog";
+import { getExerciseDetails } from "./lib/exerciseDetails";
 
 // Get all exercises (global + user's custom)
 export const getAllExercises = query({
@@ -64,68 +66,97 @@ export const seedExercises = mutation({
       return { message: "Exercises already seeded" };
     }
 
-    const exercises = [
-      // Chest
-      { name: "Bench Press", muscleGroup: "Chest", equipment: "Barbell" },
-      { name: "Incline Bench Press", muscleGroup: "Chest", equipment: "Barbell" },
-      { name: "Dumbbell Bench Press", muscleGroup: "Chest", equipment: "Dumbbell" },
-      { name: "Incline Dumbbell Press", muscleGroup: "Chest", equipment: "Dumbbell" },
-      { name: "Chest Fly", muscleGroup: "Chest", equipment: "Dumbbell" },
-      { name: "Cable Crossover", muscleGroup: "Chest", equipment: "Cable" },
-      { name: "Push-Up", muscleGroup: "Chest", equipment: "Bodyweight" },
-      
-      // Back
-      { name: "Deadlift", muscleGroup: "Back", equipment: "Barbell" },
-      { name: "Barbell Row", muscleGroup: "Back", equipment: "Barbell" },
-      { name: "Dumbbell Row", muscleGroup: "Back", equipment: "Dumbbell" },
-      { name: "Pull-Up", muscleGroup: "Back", equipment: "Bodyweight" },
-      { name: "Lat Pulldown", muscleGroup: "Back", equipment: "Cable" },
-      { name: "Seated Cable Row", muscleGroup: "Back", equipment: "Cable" },
-      { name: "T-Bar Row", muscleGroup: "Back", equipment: "Barbell" },
-      
-      // Shoulders
-      { name: "Overhead Press", muscleGroup: "Shoulders", equipment: "Barbell" },
-      { name: "Dumbbell Shoulder Press", muscleGroup: "Shoulders", equipment: "Dumbbell" },
-      { name: "Lateral Raise", muscleGroup: "Shoulders", equipment: "Dumbbell" },
-      { name: "Front Raise", muscleGroup: "Shoulders", equipment: "Dumbbell" },
-      { name: "Rear Delt Fly", muscleGroup: "Shoulders", equipment: "Dumbbell" },
-      { name: "Face Pull", muscleGroup: "Shoulders", equipment: "Cable" },
-      
-      // Legs
-      { name: "Squat", muscleGroup: "Legs", equipment: "Barbell" },
-      { name: "Front Squat", muscleGroup: "Legs", equipment: "Barbell" },
-      { name: "Leg Press", muscleGroup: "Legs", equipment: "Machine" },
-      { name: "Romanian Deadlift", muscleGroup: "Legs", equipment: "Barbell" },
-      { name: "Leg Curl", muscleGroup: "Legs", equipment: "Machine" },
-      { name: "Leg Extension", muscleGroup: "Legs", equipment: "Machine" },
-      { name: "Calf Raise", muscleGroup: "Legs", equipment: "Machine" },
-      { name: "Bulgarian Split Squat", muscleGroup: "Legs", equipment: "Dumbbell" },
-      { name: "Lunges", muscleGroup: "Legs", equipment: "Dumbbell" },
-      
-      // Arms
-      { name: "Barbell Curl", muscleGroup: "Arms", equipment: "Barbell" },
-      { name: "Dumbbell Curl", muscleGroup: "Arms", equipment: "Dumbbell" },
-      { name: "Hammer Curl", muscleGroup: "Arms", equipment: "Dumbbell" },
-      { name: "Tricep Pushdown", muscleGroup: "Arms", equipment: "Cable" },
-      { name: "Skull Crusher", muscleGroup: "Arms", equipment: "Barbell" },
-      { name: "Tricep Dip", muscleGroup: "Arms", equipment: "Bodyweight" },
-      { name: "Close-Grip Bench Press", muscleGroup: "Arms", equipment: "Barbell" },
-      
-      // Core
-      { name: "Plank", muscleGroup: "Core", equipment: "Bodyweight" },
-      { name: "Hanging Leg Raise", muscleGroup: "Core", equipment: "Bodyweight" },
-      { name: "Cable Crunch", muscleGroup: "Core", equipment: "Cable" },
-      { name: "Ab Wheel Rollout", muscleGroup: "Core", equipment: "Ab Wheel" },
-    ];
+    const exercises = SEED_EXERCISES;
 
     for (const exercise of exercises) {
       await ctx.db.insert("exercises", {
         ...exercise,
+        ...(getExerciseDetails(exercise.name) ?? {}),
         isGlobal: true,
         createdAt: Date.now(),
       });
     }
 
     return { message: `Seeded ${exercises.length} exercises` };
+  },
+});
+
+// Patch library details (instructions, muscles, alternatives, GIF) onto
+// existing global exercises by name. Idempotent: unchanged docs are skipped.
+// Run with: npx convex run exercises:backfillExerciseDetails
+export const backfillExerciseDetails = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const globals = await ctx.db
+      .query("exercises")
+      .withIndex("by_global", (q) => q.eq("isGlobal", true))
+      .collect();
+
+    let patched = 0;
+    let unchanged = 0;
+    const missing: string[] = [];
+    for (const exercise of globals) {
+      const details = getExerciseDetails(exercise.name);
+      if (!details) {
+        missing.push(exercise.name);
+        continue;
+      }
+      const current = {
+        instructions: exercise.instructions,
+        primaryMuscles: exercise.primaryMuscles,
+        secondaryMuscles: exercise.secondaryMuscles,
+        alternatives: exercise.alternatives,
+        gifUrl: exercise.gifUrl,
+      };
+      const next = {
+        instructions: details.instructions,
+        primaryMuscles: details.primaryMuscles,
+        secondaryMuscles: details.secondaryMuscles,
+        alternatives: details.alternatives,
+        gifUrl: details.gifUrl,
+      };
+      if (JSON.stringify(current) === JSON.stringify(next)) {
+        unchanged++;
+        continue;
+      }
+      await ctx.db.patch(exercise._id, next);
+      patched++;
+    }
+
+    return { patched, unchanged, missing };
+  },
+});
+
+// Exercise detail for the library page. Alternatives are resolved to ids
+// among exercises visible to the user (global + own custom).
+export const getExerciseDetail = query({
+  args: { exerciseId: v.id("exercises") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const exercise = await ctx.db.get(args.exerciseId);
+    if (!exercise) return null;
+    if (!exercise.isGlobal && exercise.userId !== userId) return null;
+
+    const names = exercise.alternatives ?? [];
+    const visible = names.length
+      ? [
+          ...(await ctx.db
+            .query("exercises")
+            .withIndex("by_global", (q) => q.eq("isGlobal", true))
+            .collect()),
+          ...(userId
+            ? await ctx.db
+                .query("exercises")
+                .withIndex("by_user", (q) => q.eq("userId", userId))
+                .collect()
+            : []),
+        ]
+      : [];
+    const alternatives = names.map((name) => ({
+      name,
+      exerciseId: visible.find((e) => e.name === name)?._id ?? null,
+    }));
+
+    return { ...exercise, alternatives };
   },
 });
