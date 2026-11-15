@@ -93,7 +93,7 @@ export function ExerciseCard({
 
   return (
     <div data-exercise-id={exerciseId}>
-      <div className="flex items-start gap-3 mb-2">
+      <div className="flex items-start gap-3 mb-3">
         <div className="w-10 h-10 bg-primary-muted rounded-xl flex items-center justify-center shrink-0">
           <Dumbbell className="w-5 h-5 text-primary" />
         </div>
@@ -107,21 +107,6 @@ export function ExerciseCard({
           </p>
         </div>
 
-        {target && !disabled && (
-          <ProgressionHint
-            exerciseId={entry.exerciseId}
-            target={target}
-            units={units}
-            compact
-            className="shrink-0"
-            onApply={
-              onApplyTarget
-                ? ({ weight, reps }) => onApplyTarget(entry.exerciseId, weight, reps)
-                : undefined
-            }
-          />
-        )}
-
         {!disabled && (
           <button
             type="button"
@@ -133,6 +118,22 @@ export function ExerciseCard({
           </button>
         )}
       </div>
+
+      {/* Next target: own row so it never squeezes the exercise name on phones */}
+      {target && !disabled && (
+        <ProgressionHint
+          exerciseId={entry.exerciseId}
+          target={target}
+          units={units}
+          compact
+          className="mb-3"
+          onApply={
+            onApplyTarget
+              ? ({ weight, reps }) => onApplyTarget(entry.exerciseId, weight, reps)
+              : undefined
+          }
+        />
+      )}
 
       {/* Last time */}
       {lastTime && lastTime.sets.length > 0 && (

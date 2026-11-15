@@ -10,7 +10,6 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { deriveSessionExercises } from "@/convex/lib/sessionExercises";
 import { useAchievementToasts } from "@/app/components/achievement-toast";
-import { PRCelebration } from "@/app/components/pr-celebration";
 import { ExerciseSelector } from "@/app/components/exercise-selector";
 import {
   computeSessionStats,
@@ -37,13 +36,6 @@ import {
   type LoggerExercise,
   type SetDraft,
 } from "./types";
-
-type PRInfo = {
-  type: "weight" | "volume" | "e1rm";
-  value: number;
-  previousValue?: number;
-  exerciseName?: string;
-};
 
 type SelectorState = null | { mode: "add" } | { mode: "swap"; exerciseId: Id<"exercises"> };
 
@@ -83,8 +75,6 @@ export function WorkoutLogger({ date }: { date: string }) {
   const [selector, setSelector] = useState<SelectorState>(null);
   const [completing, setCompleting] = useState(false);
   const [completedStreak, setCompletedStreak] = useState<number | null>(null);
-  const [prData, setPrData] = useState<PRInfo[] | null>(null);
-  const closePR = useCallback(() => setPrData(null), []);
   const { showAchievements, AchievementToasts } = useAchievementToasts();
 
   const weightInputs = useRef(new Map<string, HTMLInputElement>());
@@ -282,9 +272,6 @@ export function WorkoutLogger({ date }: { date: string }) {
           date,
           setType: values.setType,
         });
-        if (pr.newPRs.length > 0) {
-          setPrData(pr.newPRs.map((p) => ({ ...p, exerciseName: entry.exercise?.name })));
-        }
         if (pr.newAchievement) showAchievements([pr.newAchievement]);
       }
     } catch (error) {
@@ -489,7 +476,6 @@ export function WorkoutLogger({ date }: { date: string }) {
   return (
     <div className="space-y-4">
       <AchievementToasts />
-      {prData && <PRCelebration prs={prData} onClose={closePR} />}
 
       {isCompleted && sessionData && (
         <WorkoutSummary
@@ -627,8 +613,6 @@ export function WorkoutLogger({ date }: { date: string }) {
         </div>
       )}
 
-      {/* Spacer so the floating timer never covers the last controls */}
-      {restTimer.timer && <div className="h-24" aria-hidden />}
       {restTimer.timer && (
         <RestTimerBar timer={restTimer.timer} onAdjust={restTimer.adjust} onSkip={restTimer.skip} />
       )}

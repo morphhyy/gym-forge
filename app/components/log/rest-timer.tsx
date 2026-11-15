@@ -11,7 +11,7 @@ interface RestTimerBarProps {
   onSkip: () => void;
 }
 
-/** Floating rest timer, docked above the mobile bottom nav. */
+/** Floating rest timer, docked under the mobile header (top of the desktop content area). */
 export function RestTimerBar({ timer, onAdjust, onSkip }: RestTimerBarProps) {
   // Remaining time is always derived from the end timestamp, so throttled
   // background ticks can't make it drift.
@@ -24,7 +24,7 @@ export function RestTimerBar({ timer, onAdjust, onSkip }: RestTimerBarProps) {
       role="timer"
       aria-live="off"
       aria-label={`Rest timer, ${Math.ceil(remainingMs / 1000)} seconds remaining`}
-      className="fixed inset-x-0 bottom-24 lg:bottom-6 lg:left-64 z-40 px-4 pointer-events-none"
+      className="fixed inset-x-0 top-16 lg:top-6 lg:left-64 z-40 px-4 pointer-events-none"
     >
       <div className="max-w-md mx-auto pointer-events-auto bg-card border border-primary/40 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.45)] overflow-hidden">
         <div className="h-1 bg-background">
