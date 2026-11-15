@@ -2,65 +2,79 @@ import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { query } from "./_generated/server";
 import { getAuthUserId } from "./auth";
+import { addDays, resolveToday, weekStartSunday } from "./lib/dates";
+import { getUserExerciseSets } from "./lib/sessionSets";
+
+// Client's local calendar date (YYYY-MM-DD). Optional only so older clients
+// keep validating; falls back to the UTC date when omitted.
+const todayArg = v.optional(v.string());
 
 // Get exercise history for charts
 export const getExerciseHistory = query({
   args: {
     exerciseId: v.id("exercises"),
     days: v.optional(v.number()), // Number of days to look back
+    today: todayArg,
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
     const daysBack = args.days ?? 90;
+    const cutoffString = addDays(resolveToday(args.today), -daysBack);
 
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysBack);
-    const cutoffString = cutoffDate.toISOString().split("T")[0];
-
-    // Get all user sessions
+    // User's sessions in range (index range query, no table scan)
     const sessions = await ctx.db
       .query("sessions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .filter((q) => q.gte(q.field("date"), cutoffString))
+      .withIndex("by_user_date", (q) =>
+        q.eq("userId", userId).gte("date", cutoffString)
+      )
       .collect();
+    const sessionById = new Map(sessions.map((s) => [s._id, s]));
 
-    // Get sets for this exercise from each session
+    // All sets for this exercise in those sessions in one indexed read
+    // (plus legacy rows without userId), instead of one query per session.
+    const exerciseSets = await getUserExerciseSets(
+      ctx,
+      userId,
+      args.exerciseId,
+      new Set(sessionById.keys())
+    );
+
+    const setsBySession = new Map<Id<"sessions">, typeof exerciseSets>();
+    for (const set of exerciseSets) {
+      const list = setsBySession.get(set.sessionId);
+      if (list) list.push(set);
+      else setsBySession.set(set.sessionId, [set]);
+    }
+
     const history = [];
-    for (const session of sessions) {
-      const sets = await ctx.db
-        .query("sessionSets")
-        .withIndex("by_session_exercise", (q) =>
-          q.eq("sessionId", session._id).eq("exerciseId", args.exerciseId)
-        )
-        .collect();
+    for (const [sessionId, sets] of setsBySession) {
+      const session = sessionById.get(sessionId)!;
 
-      if (sets.length > 0) {
-        // Calculate metrics
-        const topSet = sets.reduce((best, set) =>
-          set.weight > best.weight ? set : best
-          , sets[0]);
+      // Calculate metrics
+      const topSet = sets.reduce((best, set) =>
+        set.weight > best.weight ? set : best
+        , sets[0]);
 
-        const totalVolume = sets.reduce(
-          (sum, set) => sum + set.weight * set.repsActual,
-          0
-        );
+      const totalVolume = sets.reduce(
+        (sum, set) => sum + set.weight * set.repsActual,
+        0
+      );
 
-        // Estimated 1RM using Epley formula: weight * (1 + reps/30)
-        const estimated1RM = topSet.weight * (1 + topSet.repsActual / 30);
+      // Estimated 1RM using Epley formula: weight * (1 + reps/30)
+      const estimated1RM = topSet.weight * (1 + topSet.repsActual / 30);
 
-        history.push({
-          date: session.date,
-          sessionId: session._id,
-          topSetWeight: topSet.weight,
-          topSetReps: topSet.repsActual,
-          totalVolume,
-          estimated1RM: Math.round(estimated1RM * 10) / 10,
-          setCount: sets.length,
-          sets: sets.sort((a, b) => a.setIndex - b.setIndex),
-        });
-      }
+      history.push({
+        date: session.date,
+        sessionId: session._id,
+        topSetWeight: topSet.weight,
+        topSetReps: topSet.repsActual,
+        totalVolume,
+        estimated1RM: Math.round(estimated1RM * 10) / 10,
+        setCount: sets.length,
+        sets: sets.sort((a, b) => a.setIndex - b.setIndex),
+      });
     }
 
     // Sort by date ascending
@@ -72,22 +86,21 @@ export const getExerciseHistory = query({
 export const getWeeklySummary = query({
   args: {
     weeks: v.optional(v.number()),
+    today: todayArg,
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
     const weeksBack = args.weeks ?? 8;
+    const cutoffString = addDays(resolveToday(args.today), -weeksBack * 7);
 
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - weeksBack * 7);
-    const cutoffString = cutoffDate.toISOString().split("T")[0];
-
-    // Get all sessions in range
+    // Get all sessions in range (index range query)
     const sessions = await ctx.db
       .query("sessions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .filter((q) => q.gte(q.field("date"), cutoffString))
+      .withIndex("by_user_date", (q) =>
+        q.eq("userId", userId).gte("date", cutoffString)
+      )
       .collect();
 
     // Group by week
@@ -100,8 +113,7 @@ export const getWeeklySummary = query({
     }> = {};
 
     for (const session of sessions) {
-      const date = new Date(session.date);
-      const weekStart = getWeekStart(date);
+      const weekStart = weekStartSunday(session.date);
 
       if (!weeklyData[weekStart]) {
         weeklyData[weekStart] = {
@@ -143,8 +155,8 @@ export const getWeeklySummary = query({
 
 // Get all exercise stats for dashboard
 export const getAllExerciseStats = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { today: todayArg },
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
@@ -155,10 +167,7 @@ export const getAllExerciseStats = query({
       .collect();
 
     // Calculate date thresholds
-    const now = new Date();
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoString = sevenDaysAgo.toISOString().split("T")[0];
+    const sevenDaysAgoString = addDays(resolveToday(args.today), -7);
 
     // Aggregate by exercise
     const exerciseStats: Record<string, {
@@ -249,14 +258,6 @@ export const getAllExerciseStats = query({
     );
   },
 });
-
-// Helper function to get week start (Sunday)
-function getWeekStart(date: Date): string {
-  const d = new Date(date);
-  const day = d.getDay(); // 0=Sunday, 6=Saturday
-  d.setDate(d.getDate() - day); // Go back to Sunday
-  return d.toISOString().split("T")[0];
-}
 
 // Get suggestions for an exercise
 export const getExerciseSuggestions = query({
@@ -373,6 +374,26 @@ export const getBatchExerciseSuggestions = query({
       lastWeight?: number;
     }> = {};
 
+    // Load each recent session's sets once (one query per session) instead of
+    // one query per (exercise x session) pair.
+    const requested = new Set<string>(args.exerciseIds);
+    const sessionSets = await Promise.all(
+      sessions.map(async (session) => {
+        const sets = await ctx.db
+          .query("sessionSets")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .collect();
+        const byExercise = new Map<string, typeof sets>();
+        for (const set of sets) {
+          if (!requested.has(set.exerciseId)) continue;
+          const list = byExercise.get(set.exerciseId);
+          if (list) list.push(set);
+          else byExercise.set(set.exerciseId, [set]);
+        }
+        return { session, byExercise };
+      })
+    );
+
     for (const exerciseId of args.exerciseIds) {
       // Get recent data for this exercise
       const recentData: {
@@ -380,13 +401,8 @@ export const getBatchExerciseSuggestions = query({
         sets: { repsActual: number; weight: number }[];
       }[] = [];
 
-      for (const session of sessions) {
-        const sets = await ctx.db
-          .query("sessionSets")
-          .withIndex("by_session_exercise", (q) =>
-            q.eq("sessionId", session._id).eq("exerciseId", exerciseId)
-          )
-          .collect();
+      for (const { session, byExercise } of sessionSets) {
+        const sets = byExercise.get(exerciseId) ?? [];
 
         if (sets.length > 0) {
           recentData.push({

@@ -68,10 +68,12 @@ function CustomTooltip({ active, payload, weightUnit = "kg" }: CustomTooltipProp
 export default function ExerciseProgressPage() {
   const params = useParams();
   const exerciseId = params.exerciseId as Id<"exercises">;
+  const today = format(new Date(), "yyyy-MM-dd");
 
   const history = useQuery(api.progress.getExerciseHistory, {
     exerciseId,
     days: 90,
+    today,
   });
   const suggestions = useQuery(api.progress.getExerciseSuggestions, {
     exerciseId,

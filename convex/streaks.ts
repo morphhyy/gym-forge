@@ -4,55 +4,24 @@ import { getAuthUserId, requireAuth } from "./auth";
 import {
   computePlannedStreak,
   getPreviousWorkoutDate,
-  getTodayDateStr,
   getWorkoutWeekdaysFromActivePlan,
   isSessionCompletedOnDate
 } from "./lib/plannedStreak";
-
-// Achievement types and their criteria
-const STREAK_ACHIEVEMENTS = [
-  { type: "streak_3", threshold: 3, label: "3-Day Streak" },
-  { type: "streak_7", threshold: 7, label: "Week Warrior" },
-  { type: "streak_14", threshold: 14, label: "Two Week Titan" },
-  { type: "streak_30", threshold: 30, label: "Monthly Master" },
-  { type: "streak_60", threshold: 60, label: "Iron Will" },
-  { type: "streak_100", threshold: 100, label: "Century Club" },
-];
-
-// Helper to get start of current week (Sunday)
-function getWeekStart(date: Date): string {
-  const d = new Date(date);
-  const day = d.getUTCDay(); // 0=Sunday, 6=Saturday
-  d.setUTCDate(d.getUTCDate() - day); // Go back to Sunday
-  return d.toISOString().split("T")[0];
-}
-
-// Helper to check if two dates are consecutive days
-function areConsecutiveDays(date1: string, date2: string): boolean {
-  const d1 = new Date(date1);
-  const d2 = new Date(date2);
-  const diffTime = Math.abs(d2.getTime() - d1.getTime());
-  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays === 1;
-}
-
-// Helper to check if date is today
-function isToday(dateStr: string): boolean {
-  const today = new Date().toISOString().split("T")[0];
-  return dateStr === today;
-}
-
-// Helper to check if date is yesterday
-function isYesterday(dateStr: string): boolean {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return dateStr === yesterday.toISOString().split("T")[0];
-}
+import { addDays, resolveToday, weekStartSunday } from "./lib/dates";
+import {
+  STREAK_ACHIEVEMENTS,
+  awardStreakAchievements,
+  nextCalendarStreak,
+} from "./lib/streakAchievements";
 
 // Get current streak data for the user
 export const getStreakData = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    // Client's local calendar date (YYYY-MM-DD). Optional only for old clients;
+    // falls back to the UTC date when omitted.
+    today: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
@@ -63,20 +32,21 @@ export const getStreakData = query({
 
     if (!user) return null;
 
-    // Get weekly progress
-    const weekStart = getWeekStart(new Date());
+    const today = resolveToday(args.today);
+
+    // Get weekly progress (sessions from this week's Sunday onward)
+    const weekStart = weekStartSunday(today);
     const sessions = await ctx.db
       .query("sessions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user_date", (q) =>
+        q.eq("userId", userId).gte("date", weekStart)
+      )
       .collect();
 
-    const weeklyCompleted = sessions.filter(
-      (s) => s.completedAt && s.date >= weekStart
-    ).length;
+    const weeklyCompleted = sessions.filter((s) => s.completedAt).length;
 
     // Get workout weekdays from active plan
     const workoutWeekdays = await getWorkoutWeekdaysFromActivePlan(ctx, userId);
-    const today = getTodayDateStr();
 
     let currentStreak = user.currentStreak ?? 0;
 
@@ -117,54 +87,23 @@ export const updateStreak = mutation({
     const currentStreak = user.currentStreak ?? 0;
     const longestStreak = user.longestStreak ?? 0;
 
-    let newStreak = currentStreak;
-    const newAchievements: string[] = [];
-
-    // Don't update streak if already logged today
+    // Don't update streak if already logged on this date
     if (lastWorkoutDate === args.sessionDate) {
       return { streak: currentStreak, newAchievements: [] };
     }
 
-    // Calculate new streak
-    if (!lastWorkoutDate) {
-      // First workout ever
-      newStreak = 1;
-    } else if (areConsecutiveDays(lastWorkoutDate, args.sessionDate)) {
-      // Consecutive day - increment streak
-      newStreak = currentStreak + 1;
-    } else if (isToday(args.sessionDate) && isYesterday(lastWorkoutDate)) {
-      // Today's workout after yesterday - increment
-      newStreak = currentStreak + 1;
-    } else {
-      // Streak broken - reset to 1
-      newStreak = 1;
-    }
+    const newStreak = nextCalendarStreak(lastWorkoutDate, currentStreak, args.sessionDate);
 
     // Calculate new longest streak
     const newLongestStreak = Math.max(longestStreak, newStreak);
 
     // Check for new achievements
-    for (const achievement of STREAK_ACHIEVEMENTS) {
-      if (newStreak >= achievement.threshold && currentStreak < achievement.threshold) {
-        // Check if achievement already earned
-        const existing = await ctx.db
-          .query("achievements")
-          .withIndex("by_user_type", (q) =>
-            q.eq("userId", userId).eq("type", achievement.type)
-          )
-          .first();
-
-        if (!existing) {
-          await ctx.db.insert("achievements", {
-            userId,
-            type: achievement.type,
-            unlockedAt: Date.now(),
-            metadata: { streak: newStreak },
-          });
-          newAchievements.push(achievement.type);
-        }
-      }
-    }
+    const newAchievements = await awardStreakAchievements(
+      ctx,
+      userId,
+      currentStreak,
+      newStreak
+    );
 
     // Update user record
     await ctx.db.patch(user._id, {
@@ -236,8 +175,12 @@ export const getUserAchievements = query({
 // Check if streak is at risk (hasn't worked out today and streak > 0)
 // Now plan-aware: only shows "at_risk" on workout days, rest days never break streak
 export const getStreakStatus = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    // Client's local calendar date (YYYY-MM-DD). Optional only for old clients;
+    // falls back to the UTC date when omitted.
+    today: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
@@ -248,7 +191,8 @@ export const getStreakStatus = query({
 
     if (!user) return null;
 
-    const today = getTodayDateStr();
+    const today = resolveToday(args.today);
+    const yesterday = addDays(today, -1);
 
     // Get workout weekdays from active plan
     const workoutWeekdays = await getWorkoutWeekdaysFromActivePlan(ctx, userId);
@@ -266,7 +210,7 @@ export const getStreakStatus = query({
         return { status: "completed", streak: currentStreak };
       }
 
-      if (lastWorkoutDate && isYesterday(lastWorkoutDate)) {
+      if (lastWorkoutDate === yesterday) {
         return { status: "at_risk", streak: currentStreak };
       }
 

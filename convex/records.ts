@@ -4,7 +4,7 @@ import { requireAuth, getAuthUserId } from "./auth";
 import { Id } from "./_generated/dataModel";
 
 // Calculate estimated 1RM using Epley formula (same as frontend)
-function calculateE1RM(weight: number, reps: number): number {
+export function calculateE1RM(weight: number, reps: number): number {
   if (reps === 1) return weight;
   return Math.round(weight * (1 + reps / 30) * 10) / 10;
 }

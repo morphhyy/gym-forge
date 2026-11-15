@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { requireAuth, getAuthUserId } from "./auth";
 import { Id } from "./_generated/dataModel";
 import { nanoid } from "nanoid";
+import { weekdayOf } from "./lib/dates";
 
 // Get user's active plan with all days and exercises
 export const getActivePlan = query({
@@ -123,9 +124,8 @@ export const getTodayTemplate = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    // Get weekday (0=Sunday, 6=Saturday - matches JS Date.getDay())
-    const dateObj = new Date(args.date);
-    const weekday = dateObj.getUTCDay();
+    // Weekday of the client's calendar date (0=Sunday, 6=Saturday), tz-independent
+    const weekday = weekdayOf(args.date);
 
     const plan = await ctx.db
       .query("plans")

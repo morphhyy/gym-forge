@@ -92,6 +92,10 @@ export default defineSchema({
   // Individual sets logged in a session
   sessionSets: defineTable({
     sessionId: v.id("sessions"),
+    // Denormalised owner (Clerk ID) so per-exercise history doesn't need a
+    // query per session. Optional: rows written before this field existed
+    // don't have it (see sessions.backfillSessionSetUserIds).
+    userId: v.optional(v.string()),
     exerciseId: v.id("exercises"),
     setIndex: v.number(),
     repsActual: v.number(),
@@ -100,7 +104,8 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_session", ["sessionId"])
-    .index("by_session_exercise", ["sessionId", "exerciseId"]),
+    .index("by_session_exercise", ["sessionId", "exerciseId"])
+    .index("by_user_exercise", ["userId", "exerciseId"]),
 
   // Achievement badges for gamification
   achievements: defineTable({

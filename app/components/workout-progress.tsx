@@ -96,8 +96,9 @@ type ExerciseStatItem = {
 
 export function WorkoutProgress() {
   const router = useRouter();
-  const weeklyStats = useQuery(api.progress.getWeeklySummary, { weeks: 12 });
-  const exerciseStats = useQuery(api.progress.getAllExerciseStats);
+  const today = format(new Date(), "yyyy-MM-dd");
+  const weeklyStats = useQuery(api.progress.getWeeklySummary, { weeks: 12, today });
+  const exerciseStats = useQuery(api.progress.getAllExerciseStats, { today });
   const userData = useQuery(api.users.getCurrentUser);
 
   const weightUnit = userData?.units || "kg";
