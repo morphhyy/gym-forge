@@ -16,8 +16,16 @@ import {
   TrendingUp,
   Sparkles,
   CheckCircle2,
+  Download,
 } from "lucide-react";
+import Image from "next/image";
 import { DumbbellIcon } from "@/app/components/dumbbell-icon";
+import {
+  PLAN_PDF_FILENAME,
+  PLAN_PDF_URL,
+  exerciseGifSrc,
+  previewGifs,
+} from "@/app/plans/recomp/data";
 
 export default function LandingPage() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -249,6 +257,76 @@ export default function LandingPage() {
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Free Recomp Plan */}
+      <section className="py-24 px-6 bg-card/50 border-t border-border">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className="grid grid-cols-2 gap-3 order-2 lg:order-1">
+              {previewGifs.map(({ gif, label }) => (
+                <figure
+                  key={gif}
+                  className="rounded-xl overflow-hidden border border-border bg-[#EEF1F8]"
+                >
+                  <Image
+                    src={exerciseGifSrc(gif)}
+                    alt={`Animated demo: ${label}`}
+                    width={360}
+                    height={240}
+                    unoptimized
+                    className="w-full h-auto block"
+                  />
+                  <figcaption className="px-3 py-2 text-xs font-medium bg-card text-muted-foreground">
+                    {label}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+
+            <div className="order-1 lg:order-2">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-muted rounded-full text-primary text-sm font-medium mb-6">
+                <Flame className="w-4 h-4" />
+                Free Plan
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold mb-6">
+                5-Day Recomp Plan: ~80 → 72 kg
+              </h2>
+              <p className="text-muted-foreground text-lg mb-8">
+                Lose fat and build muscle at the same time. A full gym split
+                with an animated demo for every exercise, calorie and macro
+                targets, and a 7-day Nepali meal plan.
+              </p>
+              <div className="space-y-4 mb-8">
+                {[
+                  "Push · Pull · Legs · Upper · Lower, ~60 min a session",
+                  "30 exercises with sets, reps, rest and form cues",
+                  "~1,900 kcal and 150 g protein a day, with a formula for yours",
+                  "7-day meal plan, swaps and a 16-week tracker",
+                ].map((item) => (
+                  <div key={item} className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link href="/plans/recomp" className="btn btn-primary text-base px-6 py-3 group">
+                  View the plan
+                  <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                </Link>
+                <a
+                  href={PLAN_PDF_URL}
+                  download={PLAN_PDF_FILENAME}
+                  className="btn btn-secondary text-base px-6 py-3"
+                >
+                  <Download className="w-5 h-5" />
+                  Download PDF
+                </a>
               </div>
             </div>
           </div>
