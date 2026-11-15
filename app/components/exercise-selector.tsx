@@ -26,12 +26,14 @@ interface ExerciseSelectorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (exerciseId: Id<"exercises">, exerciseName: string) => void;
+  title?: string;
 }
 
 export function ExerciseSelector({
   open,
   onOpenChange,
   onSelect,
+  title = "Add Exercise",
 }: ExerciseSelectorProps) {
   const [search, setSearch] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -113,7 +115,7 @@ export function ExerciseSelector({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Add Exercise</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
 
         {!showCreateForm ? (

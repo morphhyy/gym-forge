@@ -4,6 +4,11 @@ import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import { getAuthUserId, requireAuth } from "./auth";
 import {
+  adHocKey,
+  deriveSessionExercises,
+  SessionExerciseEntry,
+} from "./lib/sessionExercises";
+import {
   computePlannedStreak,
   getWorkoutWeekdaysFromActivePlan,
   isWorkoutDayForDate,
@@ -38,17 +43,27 @@ export const getOrCreateSession = mutation({
       return existingSession._id;
     }
 
+    // Only attach a plan the caller owns; otherwise its template would be
+    // copied into this session (cross-user plan disclosure).
+    let planId = args.planId;
+    if (planId) {
+      const plan = await ctx.db.get(planId);
+      if (!plan || plan.userId !== userId) planId = undefined;
+    }
+
     // Weekday of the calendar date (0=Sunday, 6=Saturday), tz-independent
     assertDateStr(args.date);
     const weekday = weekdayOf(args.date);
 
     // Create new session
+    const now = Date.now();
     return await ctx.db.insert("sessions", {
       userId,
       date: args.date,
-      planId: args.planId,
+      planId,
       weekday,
-      createdAt: Date.now(),
+      startedAt: now,
+      createdAt: now,
     });
   },
 });
@@ -78,17 +93,288 @@ export const getSessionByDate = query({
     // Get exercise details for each set
     const setsWithExercise = await Promise.all(
       sets.map(async (set) => {
-        const exercise = await ctx.db.get(set.exerciseId);
+        const exercise = visibleExercise(await ctx.db.get(set.exerciseId), userId);
         return { ...set, exercise };
       })
     );
 
+    // Resolve exercise details for the session-level exercise list (if
+    // materialized), so ad-hoc / swapped exercises can be rendered.
+    const exercises = session.exercises
+      ? await Promise.all(
+          session.exercises.map(async (e) => ({
+            ...e,
+            exercise: visibleExercise(await ctx.db.get(e.exerciseId), userId),
+          }))
+        )
+      : undefined;
+
     return {
       ...session,
+      exercises,
       sets: setsWithExercise,
     };
   },
 });
+
+const setTypeValidator = v.union(
+  v.literal("normal"),
+  v.literal("warmup"),
+  v.literal("drop"),
+  v.literal("failure")
+);
+
+async function getOwnedSession(
+  ctx: MutationCtx,
+  sessionId: Id<"sessions">
+): Promise<Doc<"sessions">> {
+  const userId = await requireAuth(ctx);
+  const session = await ctx.db.get(sessionId);
+  if (!session || session.userId !== userId) {
+    throw new Error("Session not found");
+  }
+  return session;
+}
+
+/**
+ * Return the session's exercise list, deriving it from the plan template +
+ * logged sets when it hasn't been materialized yet. Callers that change the
+ * list write it back to `sessions.exercises` (materializing it). See
+ * convex/lib/sessionExercises.ts for the design.
+ */
+async function loadSessionExercises(
+  ctx: MutationCtx,
+  session: Doc<"sessions">
+): Promise<SessionExerciseEntry[]> {
+  if (session.exercises) {
+    return session.exercises.map((e) => ({ ...e, sets: [...e.sets] }));
+  }
+
+  let template: Doc<"planExercises">[] = [];
+  const planId = session.planId;
+  const plan = planId ? await ctx.db.get(planId) : null;
+  if (planId && plan?.userId === session.userId && session.weekday !== undefined) {
+    const planDay = await ctx.db
+      .query("planDays")
+      .withIndex("by_plan", (q) => q.eq("planId", planId))
+      .filter((q) => q.eq(q.field("weekday"), session.weekday))
+      .first();
+    if (planDay) {
+      template = (
+        await ctx.db
+          .query("planExercises")
+          .withIndex("by_plan_day", (q) => q.eq("planDayId", planDay._id))
+          .collect()
+      ).sort((a, b) => a.order - b.order);
+    }
+  }
+
+  const logged = await ctx.db
+    .query("sessionSets")
+    .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+    .collect();
+
+  return deriveSessionExercises(template, logged);
+}
+
+function findEntryIndex(
+  entries: SessionExerciseEntry[],
+  exerciseId: Id<"exercises">
+): number {
+  const index = entries.findIndex((e) => e.exerciseId === exerciseId);
+  if (index === -1) throw new Error("Exercise is not part of this session");
+  return index;
+}
+
+async function getLoggedSetsForExercise(
+  ctx: MutationCtx,
+  sessionId: Id<"sessions">,
+  exerciseId: Id<"exercises">
+) {
+  return await ctx.db
+    .query("sessionSets")
+    .withIndex("by_session_exercise", (q) =>
+      q.eq("sessionId", sessionId).eq("exerciseId", exerciseId)
+    )
+    .collect();
+}
+
+/** Hide custom exercises that belong to someone else. */
+function visibleExercise(
+  exercise: Doc<"exercises"> | null,
+  userId: string
+): Doc<"exercises"> | null {
+  if (!exercise) return null;
+  return exercise.isGlobal || exercise.userId === userId ? exercise : null;
+}
+
+async function assertUsableExercise(
+  ctx: MutationCtx,
+  exerciseId: Id<"exercises">,
+  userId: string
+) {
+  const exercise = await ctx.db.get(exerciseId);
+  if (!exercise || (!exercise.isGlobal && exercise.userId !== userId)) {
+    throw new Error("Exercise not found");
+  }
+}
+
+const MAX_SETS_PER_EXERCISE = 30;
+
+// Add a set row to an exercise in this session (session-only, plan untouched).
+// Returns the new row's setIndex.
+export const addSessionSet = mutation({
+  args: { sessionId: v.id("sessions"), exerciseId: v.id("exercises") },
+  handler: async (ctx, args) => {
+    const session = await getOwnedSession(ctx, args.sessionId);
+    const entries = await loadSessionExercises(ctx, session);
+    const entry = entries[findEntryIndex(entries, args.exerciseId)];
+    if (entry.sets.length >= MAX_SETS_PER_EXERCISE) {
+      throw new Error("Too many sets");
+    }
+    const last = entry.sets[entry.sets.length - 1];
+    entry.sets.push(last?.repsTarget !== undefined ? { repsTarget: last.repsTarget } : {});
+    await ctx.db.patch(session._id, { exercises: entries });
+    return entry.sets.length - 1;
+  },
+});
+
+// Remove a set row (and its logged set, if any). Later sets of the same
+// exercise are re-indexed so setIndexes stay contiguous.
+export const deleteSet = mutation({
+  args: {
+    sessionId: v.id("sessions"),
+    exerciseId: v.id("exercises"),
+    setIndex: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const session = await getOwnedSession(ctx, args.sessionId);
+    const entries = await loadSessionExercises(ctx, session);
+    const entry = entries[findEntryIndex(entries, args.exerciseId)];
+    if (args.setIndex < 0 || args.setIndex >= entry.sets.length) {
+      throw new Error("Set not found");
+    }
+
+    const logged = await getLoggedSetsForExercise(ctx, session._id, args.exerciseId);
+    for (const set of logged) {
+      if (set.setIndex === args.setIndex) {
+        await ctx.db.delete(set._id);
+      } else if (set.setIndex > args.setIndex) {
+        await ctx.db.patch(set._id, { setIndex: set.setIndex - 1 });
+      }
+    }
+
+    entry.sets.splice(args.setIndex, 1);
+    await ctx.db.patch(session._id, { exercises: entries });
+    return null;
+  },
+});
+
+// Add an ad-hoc exercise (not in the plan) to this session
+export const addSessionExercise = mutation({
+  args: {
+    sessionId: v.id("sessions"),
+    exerciseId: v.id("exercises"),
+    setCount: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const session = await getOwnedSession(ctx, args.sessionId);
+    await assertUsableExercise(ctx, args.exerciseId, session.userId);
+    const entries = await loadSessionExercises(ctx, session);
+    if (entries.some((e) => e.exerciseId === args.exerciseId)) {
+      throw new Error("Exercise is already in this session");
+    }
+    const setCount = Math.min(
+      Math.max(Math.round(args.setCount ?? 3), 1),
+      MAX_SETS_PER_EXERCISE
+    );
+    entries.push({
+      key: adHocKey(args.exerciseId),
+      exerciseId: args.exerciseId,
+      sets: Array.from({ length: setCount }, () => ({})),
+    });
+    await ctx.db.patch(session._id, { exercises: entries });
+    return null;
+  },
+});
+
+// Swap an exercise for another one, for this session only. Only allowed while
+// no sets have been logged for the exercise being replaced.
+export const swapSessionExercise = mutation({
+  args: {
+    sessionId: v.id("sessions"),
+    exerciseId: v.id("exercises"),
+    newExerciseId: v.id("exercises"),
+  },
+  handler: async (ctx, args) => {
+    const session = await getOwnedSession(ctx, args.sessionId);
+    await assertUsableExercise(ctx, args.newExerciseId, session.userId);
+    const entries = await loadSessionExercises(ctx, session);
+    const index = findEntryIndex(entries, args.exerciseId);
+    if (entries.some((e) => e.exerciseId === args.newExerciseId)) {
+      throw new Error("Exercise is already in this session");
+    }
+    const logged = await getLoggedSetsForExercise(ctx, session._id, args.exerciseId);
+    if (logged.length > 0) {
+      throw new Error("Remove the logged sets before swapping this exercise");
+    }
+    const entry = entries[index];
+    const original = entry.swappedFromExerciseId ?? entry.exerciseId;
+    entries[index] = {
+      ...entry,
+      exerciseId: args.newExerciseId,
+      // Remember the originally planned exercise across repeated swaps
+      swappedFromExerciseId: original === args.newExerciseId ? undefined : original,
+    };
+    await ctx.db.patch(session._id, { exercises: entries });
+    return null;
+  },
+});
+
+// Remove an exercise (and its logged sets) from this session only
+export const removeSessionExercise = mutation({
+  args: { sessionId: v.id("sessions"), exerciseId: v.id("exercises") },
+  handler: async (ctx, args) => {
+    const session = await getOwnedSession(ctx, args.sessionId);
+    const entries = await loadSessionExercises(ctx, session);
+    const index = findEntryIndex(entries, args.exerciseId);
+    const logged = await getLoggedSetsForExercise(ctx, session._id, args.exerciseId);
+    for (const set of logged) await ctx.db.delete(set._id);
+    entries.splice(index, 1);
+    await ctx.db.patch(session._id, { exercises: entries });
+    return null;
+  },
+});
+
+// PRs set in this session that are still standing (for the finish summary)
+export const getSessionPRs = query({
+  args: { sessionId: v.id("sessions") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== userId) return [];
+
+    const prs = await ctx.db
+      .query("personalRecords")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("sessionId"), args.sessionId))
+      .collect();
+
+    return await Promise.all(
+      prs.map(async (pr) => ({
+        _id: pr._id,
+        exerciseId: pr.exerciseId,
+        exerciseName: (await ctx.db.get(pr.exerciseId))?.name ?? "Unknown",
+        recordType: pr.recordType,
+        value: pr.value,
+        reps: pr.reps,
+        previousValue: pr.previousValue,
+      }))
+    );
+  },
+});
+
 
 // Log a set
 export const logSet = mutation({
@@ -99,14 +385,21 @@ export const logSet = mutation({
     repsActual: v.number(),
     weight: v.number(),
     rpe: v.optional(v.number()),
+    setType: v.optional(setTypeValidator),
   },
   handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
+    const session = await getOwnedSession(ctx, args.sessionId);
+    const userId = session.userId;
+    await assertUsableExercise(ctx, args.exerciseId, userId);
 
-    // Verify session belongs to user
-    const session = await ctx.db.get(args.sessionId);
-    if (!session || session.userId !== userId) {
-      throw new Error("Session not found");
+    if (args.rpe !== undefined && (args.rpe < 1 || args.rpe > 10)) {
+      throw new Error("RPE must be between 1 and 10");
+    }
+    // Absent = normal; don't store the default
+    const setType = args.setType === "normal" ? undefined : args.setType;
+
+    if (session.startedAt === undefined) {
+      await ctx.db.patch(session._id, { startedAt: Date.now() });
     }
 
     // Check for existing set at this index
@@ -124,6 +417,7 @@ export const logSet = mutation({
         repsActual: args.repsActual,
         weight: args.weight,
         rpe: args.rpe,
+        setType,
         // Backfill denormalised owner on legacy rows
         ...(existingSet.userId === undefined ? { userId } : {}),
       });
@@ -138,6 +432,7 @@ export const logSet = mutation({
         repsActual: args.repsActual,
         weight: args.weight,
         rpe: args.rpe,
+        setType,
         createdAt: Date.now(),
       });
     }
@@ -355,7 +650,7 @@ export const getSessionsForMonth = query({
         let totalVolume = 0;
 
         for (const set of sets) {
-          totalVolume += set.weight * set.repsActual;
+          if (set.setType !== "warmup") totalVolume += set.weight * set.repsActual;
           if (!exerciseMap.has(set.exerciseId)) {
             exerciseMap.set(set.exerciseId, {
               name: await getExerciseName(set.exerciseId),
@@ -382,27 +677,48 @@ export const getSessionsForMonth = query({
   },
 });
 
-// Get last weights for multiple exercises (for pre-filling workout log)
+// Get the most recent previous performance for multiple exercises (for
+// pre-filling weights and the "last time" display in the workout log).
+// Per exercise: the date and sets (weight × reps) of the most recent completed
+// session containing it, optionally only sessions before `beforeDate`.
 export const getLastWeightsForExercises = query({
-  args: { exerciseIds: v.array(v.id("exercises")) },
+  args: {
+    exerciseIds: v.array(v.id("exercises")),
+    beforeDate: v.optional(v.string()), // YYYY-MM-DD, exclusive
+  },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return {};
 
+    const beforeDate = args.beforeDate;
     // Get recent completed sessions
     const sessions = await ctx.db
       .query("sessions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
-      .filter((q) => q.neq(q.field("completedAt"), undefined))
+      .filter((q) =>
+        beforeDate
+          ? q.and(
+              q.neq(q.field("completedAt"), undefined),
+              q.lt(q.field("date"), beforeDate)
+            )
+          : q.neq(q.field("completedAt"), undefined)
+      )
       .take(20);
 
-    const lastWeights: Record<string, Record<number, number>> = {};
+    type LastSet = {
+      setIndex: number;
+      weight: number;
+      reps: number;
+      rpe?: number;
+      setType?: "normal" | "warmup" | "drop" | "failure";
+    };
+    const last: Record<string, { date: string; sets: LastSet[] }> = {};
     const remaining = new Set<string>(args.exerciseIds);
 
     // Walk sessions newest-first, loading each session's sets once (at most 20
     // queries total, independent of how many exercises are requested). The
-    // first session containing an exercise provides its weights.
+    // first session containing an exercise provides its sets.
     for (const session of sessions) {
       if (remaining.size === 0) break;
 
@@ -411,19 +727,29 @@ export const getLastWeightsForExercises = query({
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
         .collect();
 
-      const foundHere = new Set<string>();
+      const foundHere = new Map<string, LastSet[]>();
       for (const set of sets) {
         if (!remaining.has(set.exerciseId)) continue;
-        if (!foundHere.has(set.exerciseId)) {
-          foundHere.add(set.exerciseId);
-          lastWeights[set.exerciseId] = {};
-        }
-        lastWeights[set.exerciseId][set.setIndex] = set.weight;
+        let list = foundHere.get(set.exerciseId);
+        if (!list) foundHere.set(set.exerciseId, (list = []));
+        list.push({
+          setIndex: set.setIndex,
+          weight: set.weight,
+          reps: set.repsActual,
+          rpe: set.rpe,
+          setType: set.setType,
+        });
       }
-      for (const id of foundHere) remaining.delete(id);
+      for (const [id, list] of foundHere) {
+        last[id] = {
+          date: session.date,
+          sets: list.sort((x, y) => x.setIndex - y.setIndex),
+        };
+        remaining.delete(id);
+      }
     }
 
-    return lastWeights;
+    return last;
   },
 });
 
@@ -454,6 +780,7 @@ function bestSetFor(
   for (const set of sets) {
     const date = sessionDates.get(set.sessionId);
     if (date === undefined) continue;
+    if (set.setType === "warmup") continue; // warm-ups never count as PRs
     const value = prValue(type, set);
     if (
       !best ||

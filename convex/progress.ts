@@ -43,6 +43,7 @@ export const getExerciseHistory = query({
 
     const setsBySession = new Map<Id<"sessions">, typeof exerciseSets>();
     for (const set of exerciseSets) {
+      if (set.setType === "warmup") continue; // exclude warm-ups
       const list = setsBySession.get(set.sessionId);
       if (list) list.push(set);
       else setsBySession.set(set.sessionId, [set]);
@@ -134,6 +135,7 @@ export const getWeeklySummary = query({
       const sets = await ctx.db
         .query("sessionSets")
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .filter((q) => q.neq(q.field("setType"), "warmup")) // exclude warm-ups
         .collect();
 
       for (const set of sets) {
@@ -186,6 +188,7 @@ export const getAllExerciseStats = query({
       const sets = await ctx.db
         .query("sessionSets")
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .filter((q) => q.neq(q.field("setType"), "warmup")) // exclude warm-ups
         .collect();
 
       for (const set of sets) {

@@ -24,6 +24,9 @@ export const upsertProfile = mutation({
     displayName: v.optional(v.string()),
     units: v.optional(v.union(v.literal("kg"), v.literal("lb"))),
     goals: v.optional(v.string()),
+    defaultRestSeconds: v.optional(v.number()),
+    restTimerSound: v.optional(v.boolean()),
+    restTimerVibrate: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
@@ -34,11 +37,22 @@ export const upsertProfile = mutation({
       .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
       .unique();
 
+    const defaultRestSeconds =
+      args.defaultRestSeconds === undefined || !Number.isFinite(args.defaultRestSeconds)
+        ? undefined
+        : Math.min(Math.max(Math.round(args.defaultRestSeconds), 0), 900);
+    const restPrefs = {
+      ...(defaultRestSeconds !== undefined && { defaultRestSeconds }),
+      ...(args.restTimerSound !== undefined && { restTimerSound: args.restTimerSound }),
+      ...(args.restTimerVibrate !== undefined && { restTimerVibrate: args.restTimerVibrate }),
+    };
+
     if (existingUser) {
       await ctx.db.patch(existingUser._id, {
         displayName: args.displayName ?? existingUser.displayName,
         units: args.units ?? existingUser.units,
         goals: args.goals ?? existingUser.goals,
+        ...restPrefs,
       });
       return existingUser._id;
     } else {
@@ -48,6 +62,7 @@ export const upsertProfile = mutation({
         displayName: args.displayName,
         units: args.units ?? "kg",
         goals: args.goals,
+        ...restPrefs,
         aiUsageCount: 0,
         createdAt: Date.now(),
       });
