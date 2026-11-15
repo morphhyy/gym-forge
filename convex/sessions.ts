@@ -11,9 +11,10 @@ import {
 import {
   computePlannedStreak,
   getWorkoutWeekdaysFromActivePlan,
+  isSessionCompletedOnDate,
   isWorkoutDayForDate,
 } from "./lib/plannedStreak";
-import { assertDateStr, monthRange, weekdayOf } from "./lib/dates";
+import { addDays, assertDateStr, monthRange, weekdayOf } from "./lib/dates";
 import {
   areConsecutiveDays,
   awardStreakAchievements,
@@ -455,11 +456,34 @@ async function applyStreakUpdate(
 }
 
 /**
+ * Consecutive calendar days with a completed session, ending at `endDate`.
+ * Used for the no-plan streak when a session is completed out of order.
+ */
+async function calendarStreakEndingAt(
+  ctx: MutationCtx,
+  userId: string,
+  endDate: string
+): Promise<number> {
+  let streak = 0;
+  let date = endDate;
+  while (streak < 366 && (await isSessionCompletedOnDate(ctx, userId, date))) {
+    streak++;
+    date = addDays(date, -1);
+  }
+  return streak;
+}
+
+/**
  * Update the user's streak for a newly completed session on `sessionDate`.
  * - Active plan + planned workout day: plan-aware streak.
  * - No active plan: calendar streak (consecutive days).
  * - Active plan + rest day: streak unchanged, lastWorkoutDate recorded.
  * Returns null when nothing changed (no-plan user, same date as last workout).
+ *
+ * A session completed for a date *before* lastWorkoutDate (backfilling a
+ * forgotten workout) recomputes the streak as of lastWorkoutDate instead of
+ * moving lastWorkoutDate backwards. Previously this reset the streak on the
+ * next workout (e.g. log Sun, Tue, then backfill Mon -> Wed restarted at 1).
  */
 async function updateStreakForCompletion(
   ctx: MutationCtx,
@@ -469,29 +493,31 @@ async function updateStreakForCompletion(
   const userId = user.clerkUserId;
   const currentStoredStreak = user.currentStreak ?? 0;
   const longestStreak = user.longestStreak ?? 0;
+  const lastWorkoutDate = user.lastWorkoutDate;
+  const isBackfill = lastWorkoutDate !== undefined && sessionDate < lastWorkoutDate;
+  // The date the streak is evaluated at (and stored as lastWorkoutDate)
+  const asOf = isBackfill ? lastWorkoutDate : sessionDate;
 
   // Get workout weekdays from active plan (null if no plan / no workout days)
   const workoutWeekdays = await getWorkoutWeekdaysFromActivePlan(ctx, userId);
 
   if (!workoutWeekdays || workoutWeekdays.size === 0) {
     // Fallback: no active plan, use calendar-based streak logic
-    if (user.lastWorkoutDate === sessionDate) return null;
-    const newStreak = nextCalendarStreak(
-      user.lastWorkoutDate,
-      currentStoredStreak,
-      sessionDate
-    );
-    return await applyStreakUpdate(ctx, user, newStreak, sessionDate);
+    if (lastWorkoutDate === sessionDate) return null;
+    const newStreak = isBackfill
+      ? await calendarStreakEndingAt(ctx, userId, asOf)
+      : nextCalendarStreak(lastWorkoutDate, currentStoredStreak, sessionDate);
+    return await applyStreakUpdate(ctx, user, newStreak, asOf);
   }
 
   if (isWorkoutDayForDate(sessionDate, workoutWeekdays)) {
     // Planned workout day: plan-aware streak computation
-    const { streak } = await computePlannedStreak(ctx, userId, sessionDate, workoutWeekdays);
-    return await applyStreakUpdate(ctx, user, streak, sessionDate);
+    const { streak } = await computePlannedStreak(ctx, userId, asOf, workoutWeekdays);
+    return await applyStreakUpdate(ctx, user, streak, asOf);
   }
 
   // Rest day workout: don't update streak, but still record lastWorkoutDate
-  await ctx.db.patch(user._id, { lastWorkoutDate: sessionDate });
+  await ctx.db.patch(user._id, { lastWorkoutDate: asOf });
   return {
     streak: currentStoredStreak,
     longestStreak,

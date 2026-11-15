@@ -8,11 +8,7 @@ import {
   isSessionCompletedOnDate
 } from "./lib/plannedStreak";
 import { addDays, resolveToday, weekStartSunday } from "./lib/dates";
-import {
-  STREAK_ACHIEVEMENTS,
-  awardStreakAchievements,
-  nextCalendarStreak,
-} from "./lib/streakAchievements";
+import { STREAK_ACHIEVEMENTS } from "./lib/streakAchievements";
 
 // Get current streak data for the user
 export const getStreakData = query({
@@ -62,60 +58,6 @@ export const getStreakData = query({
       lastWorkoutDate: user.lastWorkoutDate ?? null,
       weeklyGoal: user.weeklyGoal ?? 3,
       weeklyCompleted,
-    };
-  },
-});
-
-// Update streak when a session is completed
-export const updateStreak = mutation({
-  args: {
-    sessionDate: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const lastWorkoutDate = user.lastWorkoutDate;
-    const currentStreak = user.currentStreak ?? 0;
-    const longestStreak = user.longestStreak ?? 0;
-
-    // Don't update streak if already logged on this date
-    if (lastWorkoutDate === args.sessionDate) {
-      return { streak: currentStreak, newAchievements: [] };
-    }
-
-    const newStreak = nextCalendarStreak(lastWorkoutDate, currentStreak, args.sessionDate);
-
-    // Calculate new longest streak
-    const newLongestStreak = Math.max(longestStreak, newStreak);
-
-    // Check for new achievements
-    const newAchievements = await awardStreakAchievements(
-      ctx,
-      userId,
-      currentStreak,
-      newStreak
-    );
-
-    // Update user record
-    await ctx.db.patch(user._id, {
-      currentStreak: newStreak,
-      longestStreak: newLongestStreak,
-      lastWorkoutDate: args.sessionDate,
-    });
-
-    return {
-      streak: newStreak,
-      longestStreak: newLongestStreak,
-      newAchievements,
     };
   },
 });
