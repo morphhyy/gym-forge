@@ -21,8 +21,22 @@ export function ServiceWorkerRegistrar() {
 
   useEffect(() => {
     if (!isLoaded || isSignedIn) return;
-    if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.controller?.postMessage({ type: "CLEAR_PAGE_CACHE" });
+    // Delete cached pages directly from the window: the Cache Storage API works
+    // here and, unlike messaging `serviceWorker.controller`, doesn't silently
+    // no-op when the page isn't controlled (first load, hard reload, SW
+    // mid-update). Cache names must match PAGES_CACHE in public/sw.js.
+    if ("caches" in window) {
+      caches
+        .keys()
+        .then((keys) =>
+          Promise.all(
+            keys
+              .filter((key) => key.startsWith("gymforge-pages-"))
+              .map((key) => caches.delete(key))
+          )
+        )
+        .catch(() => {});
+    }
   }, [isLoaded, isSignedIn]);
 
   useEffect(() => {
