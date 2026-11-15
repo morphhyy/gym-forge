@@ -1,9 +1,22 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, MutationCtx, query } from "./_generated/server";
 import { requireAuth, getAuthUserId } from "./auth";
 import { Id } from "./_generated/dataModel";
 import { nanoid } from "nanoid";
 import { weekdayOf } from "./lib/dates";
+import { assertUsableExercise } from "./lib/exerciseAccess";
+
+// Reject exerciseIds the caller can't use (another user's custom exercise).
+// Without this, a plan could reference someone else's custom exercise and
+// getPlanById / getTodayTemplate would then return its full document.
+async function assertPlanExercisesUsable(
+  ctx: MutationCtx,
+  userId: string,
+  days: { exercises: { exerciseId: Id<"exercises"> }[] }[]
+) {
+  const ids = new Set(days.flatMap((d) => d.exercises.map((e) => e.exerciseId)));
+  for (const id of ids) await assertUsableExercise(ctx, id, userId);
+}
 
 // Get user's active plan with all days and exercises
 export const getActivePlan = query({
@@ -193,6 +206,8 @@ export const createPlan = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
 
+    await assertPlanExercisesUsable(ctx, userId, args.days);
+
     // NOTE: `isAIGenerated` is intentionally ignored. AI usage is now charged
     // server-side in ai.generateWorkoutPlan at generation time; trusting a
     // client flag here allowed the limit to be bypassed by not saving.
@@ -285,6 +300,7 @@ export const updatePlan = mutation({
     if (!plan || plan.userId !== userId) {
       throw new Error("Plan not found");
     }
+    await assertPlanExercisesUsable(ctx, userId, args.days);
 
     // Update plan name
     await ctx.db.patch(args.planId, { name: args.name });

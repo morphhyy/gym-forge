@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAuth, getAuthUserId } from "./auth";
 import { Id } from "./_generated/dataModel";
+import { assertUsableExercise, visibleExercise } from "./lib/exerciseAccess";
 
 // Calculate estimated 1RM using Epley formula (same as frontend)
 export function calculateE1RM(weight: number, reps: number): number {
@@ -22,6 +23,14 @@ export const checkAndUpdatePR = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
+    // The PR row references this session and exercise, so both must be the
+    // caller's (or a global exercise); otherwise PR queries would surface
+    // another user's session / custom exercise.
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== userId) {
+      throw new Error("Session not found");
+    }
+    await assertUsableExercise(ctx, args.exerciseId, userId);
     // Warm-up sets never count towards PRs
     if (args.setType === "warmup") return { newPRs: [], newAchievement: null };
 
@@ -128,8 +137,8 @@ export const getExercisePRs = query({
       )
       .collect();
 
-    // Get exercise details
-    const exercise = await ctx.db.get(args.exerciseId);
+    // Get exercise details (hidden if it's another user's custom exercise)
+    const exercise = visibleExercise(await ctx.db.get(args.exerciseId), userId);
 
     return {
       exercise,

@@ -21,6 +21,7 @@ import {
 } from "./lib/streakAchievements";
 import { getUserExerciseSets } from "./lib/sessionSets";
 import { calculateE1RM } from "./records";
+import { assertUsableExercise, visibleExercise } from "./lib/exerciseAccess";
 
 // Get or create today's session
 export const getOrCreateSession = mutation({
@@ -197,26 +198,6 @@ async function getLoggedSetsForExercise(
       q.eq("sessionId", sessionId).eq("exerciseId", exerciseId)
     )
     .collect();
-}
-
-/** Hide custom exercises that belong to someone else. */
-function visibleExercise(
-  exercise: Doc<"exercises"> | null,
-  userId: string
-): Doc<"exercises"> | null {
-  if (!exercise) return null;
-  return exercise.isGlobal || exercise.userId === userId ? exercise : null;
-}
-
-async function assertUsableExercise(
-  ctx: MutationCtx,
-  exerciseId: Id<"exercises">,
-  userId: string
-) {
-  const exercise = await ctx.db.get(exerciseId);
-  if (!exercise || (!exercise.isGlobal && exercise.userId !== userId)) {
-    throw new Error("Exercise not found");
-  }
 }
 
 const MAX_SETS_PER_EXERCISE = 30;
