@@ -124,6 +124,33 @@ describe("account deletion", () => {
     expect(await t.run((ctx) => ctx.db.get(global))).not.toBeNull();
   });
 
+  test("deleting the account doesn't reset the free AI plan quota", async () => {
+    const t = setup();
+    await createUser(t, "user_a", { aiUsageCount: 1 });
+    const a = t.withIdentity(USER_A);
+
+    // Delete the data but keep the Clerk login (e.g. never calling user.delete())
+    await a.mutation(api.account.requestAccountDeletion, { confirmation: "DELETE" });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(await t.run((ctx) => ctx.db.query("users").collect())).toHaveLength(0);
+
+    // Signing back in recreates the profile with the old usage, not 0
+    await a.mutation(api.users.ensureUser, {});
+    const usage = await a.query(api.users.getAIUsage, {});
+    expect(usage.usageCount).toBe(1);
+    expect(usage.isLimitReached).toBe(true);
+
+    await a.mutation(api.users.upsertProfile, { displayName: "Back again" });
+    expect((await a.query(api.users.getAIUsage, {})).usageCount).toBe(1);
+  });
+
+  test("a fresh user still starts at 0", async () => {
+    const t = setup();
+    const b = t.withIdentity(USER_B);
+    await b.mutation(api.users.upsertProfile, { displayName: "New" });
+    expect((await b.query(api.users.getAIUsage, {})).usageCount).toBe(0);
+  });
+
   test("large histories are deleted across several batched runs", async () => {
     const t = setup();
     const global = await createGlobalExercise(t);

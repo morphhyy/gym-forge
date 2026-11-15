@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { initInstallPromptCapture } from "@/app/lib/pwa";
+import { clearCachedPages, initInstallPromptCapture } from "@/app/lib/pwa";
 
 // Inlined at build time by next.config.ts.
 const SW_BUILD_ID = process.env.NEXT_PUBLIC_SW_BUILD_ID || "dev";
@@ -12,31 +12,18 @@ const SW_BUILD_ID = process.env.NEXT_PUBLIC_SW_BUILD_ID || "dev";
  * installed GymForge worker (e.g. from testing `next start` on the same port)
  * is unregistered so it can't serve stale assets under `next dev`.
  *
- * Must be rendered inside <ClerkProvider>: when the user is signed out we ask
- * the worker to drop its cached pages so they aren't served offline to the
- * next person using the device.
+ * Must be rendered inside <ClerkProvider>: when the user is signed out we
+ * delete the cached pages so they aren't served offline to the next person
+ * using the device.
  */
 export function ServiceWorkerRegistrar() {
   const { isLoaded, isSignedIn } = useAuth();
 
   useEffect(() => {
     if (!isLoaded || isSignedIn) return;
-    // Delete cached pages directly from the window: the Cache Storage API works
-    // here and, unlike messaging `serviceWorker.controller`, doesn't silently
-    // no-op when the page isn't controlled (first load, hard reload, SW
-    // mid-update). Cache names must match PAGES_CACHE in public/sw.js.
-    if ("caches" in window) {
-      caches
-        .keys()
-        .then((keys) =>
-          Promise.all(
-            keys
-              .filter((key) => key.startsWith("gymforge-pages-"))
-              .map((key) => caches.delete(key))
-          )
-        )
-        .catch(() => {});
-    }
+    // Also cleared at each sign-out button; this catches every other path
+    // (session expiry, signing out in another tab).
+    void clearCachedPages();
   }, [isLoaded, isSignedIn]);
 
   useEffect(() => {

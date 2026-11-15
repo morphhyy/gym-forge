@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { requireAuth, getAuthUserId } from "./auth";
 import { MAX_FREE_AI_USES } from "./lib/aiLimits";
+import { initialAiUsage } from "./lib/aiUsageTombstone";
 
 // Get current user's profile
 export const getCurrentUser = query({
@@ -63,7 +64,7 @@ export const upsertProfile = mutation({
         units: args.units ?? "kg",
         goals: args.goals,
         ...restPrefs,
-        aiUsageCount: 0,
+        aiUsageCount: await initialAiUsage(ctx, userId),
         createdAt: Date.now(),
       });
     }
@@ -87,7 +88,7 @@ export const ensureUser = mutation({
         clerkUserId: userId,
         email: identity?.email ?? "",
         units: "kg",
-        aiUsageCount: 0,
+        aiUsageCount: await initialAiUsage(ctx, userId),
         createdAt: Date.now(),
       });
     }

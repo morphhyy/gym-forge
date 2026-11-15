@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { action, internalMutation, mutation, MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireAuth } from "./auth";
+import { recordAiUsageTombstone } from "./lib/aiUsageTombstone";
 
 /*
  * Account deletion.
@@ -213,6 +214,15 @@ export const requestAccountDeletion = mutation({
     const userId = await requireAuth(ctx);
     if (args.confirmation.trim() !== DELETE_CONFIRMATION_PHRASE) {
       throw new Error(`Type ${DELETE_CONFIRMATION_PHRASE} to confirm account deletion.`);
+    }
+    // Keep the free AI quota across deletion (see lib/aiUsageTombstone.ts).
+    // Paid users have no quota to protect.
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
+      .unique();
+    if (user && !user.isPaidUser && (user.aiUsageCount ?? 0) > 0) {
+      await recordAiUsageTombstone(ctx, userId, user.aiUsageCount ?? 0);
     }
     await ctx.scheduler.runAfter(0, internal.account.deleteUserDataStep, {
       userId,

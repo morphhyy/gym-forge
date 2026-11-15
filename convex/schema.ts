@@ -234,6 +234,15 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  // Free AI plan usage kept after account deletion, so deleting your data
+  // while keeping the same Clerk login doesn't reset the free quota. Holds
+  // only the (pseudonymous) Clerk user id and a count.
+  aiUsageTombstones: defineTable({
+    clerkUserId: v.string(),
+    aiUsageCount: v.number(),
+    deletedAt: v.number(),
+  }).index("by_clerk_id", ["clerkUserId"]),
+
   // Rate limiting tracker
   rateLimits: defineTable({
     identifier: v.string(), // Hashed IP or other identifier

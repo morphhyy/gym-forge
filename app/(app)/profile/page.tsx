@@ -7,6 +7,7 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { User, Settings, LogOut, Save, Check, Target, Scale, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { clearCachedPages } from "@/app/lib/pwa";
 import { RestTimerSettings } from "@/app/components/log/rest-timer-settings";
 import { YourDataSection } from "@/app/components/your-data-section";
 import { DeleteAccountSection } from "@/app/components/delete-account-section";
@@ -259,7 +260,10 @@ export default function ProfilePage() {
           Sign out of your account on this device.
         </p>
         <button
-          onClick={() => signOut({ redirectUrl: "/" })}
+          onClick={async () => {
+            await clearCachedPages();
+            await signOut({ redirectUrl: "/" });
+          }}
           className="btn btn-danger"
         >
           <LogOut className="w-4 h-4" />

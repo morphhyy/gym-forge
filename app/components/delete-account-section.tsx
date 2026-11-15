@@ -6,6 +6,7 @@ import { useClerk, useUser } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
+import { clearCachedPages } from "@/app/lib/pwa";
 import {
   Dialog,
   DialogContent,
@@ -64,7 +65,8 @@ export function DeleteAccountSection() {
       );
     }
 
-    // 3. Sign out (no-op if Clerk already ended the session).
+    // 3. Clear cached pages, then sign out (no-op if Clerk already ended the session).
+    await clearCachedPages();
     try {
       await signOut({ redirectUrl: "/" });
     } catch {
@@ -78,7 +80,8 @@ export function DeleteAccountSection() {
       <p className="text-sm text-muted-foreground mb-4">
         Permanently delete your account and everything in it: plans, workouts, records,
         body weight and nutrition logs. This cannot be undone. Consider exporting your
-        data first.
+        data first. We keep only a count of free AI plans used, linked to your sign-in ID, so
+        the free limit can&apos;t be reset by deleting and rejoining.
       </p>
       <button type="button" onClick={() => setOpen(true)} className="btn btn-danger">
         <Trash2 className="w-4 h-4" />

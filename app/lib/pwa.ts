@@ -78,3 +78,21 @@ export function isStandalone(): boolean {
     window.matchMedia?.("(display-mode: standalone)").matches === true
   );
 }
+
+/**
+ * Delete the service worker's cached pages (gymforge-pages-*, see
+ * public/sw.js) straight from the window, so a signed-out user's pages can't
+ * be opened offline by the next person on the device. Works whether or not
+ * the page is controlled by the worker. Safe to call anywhere; never throws.
+ */
+export async function clearCachedPages(): Promise<void> {
+  try {
+    if (typeof window === "undefined" || !("caches" in window)) return;
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.filter((key) => key.startsWith("gymforge-pages-")).map((key) => caches.delete(key))
+    );
+  } catch {
+    // Cache Storage unavailable (private mode, blocked storage): nothing cached
+  }
+}
