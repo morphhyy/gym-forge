@@ -2,9 +2,11 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Toaster } from "sonner";
+import { ServiceWorkerRegistrar } from "./components/service-worker-registrar";
 
 export const metadata: Metadata = {
   title: "GymForge - Your Personal Workout Companion",
+  applicationName: "GymForge",
   description:
     "Track your workouts, build strength, and visualize your progress with GymForge.",
   appleWebApp: {
@@ -51,7 +53,10 @@ export default function RootLayout({
 
       </head>
       <body className="antialiased min-h-screen bg-background text-foreground">
-        <Providers>{children}</Providers>
+        <Providers>
+          <ServiceWorkerRegistrar />
+          {children}
+        </Providers>
         <Toaster position="top-right" richColors />
       </body>
     </html>
