@@ -22,7 +22,7 @@ npm run build
 # Linting
 npm run lint
 
-# Unit tests (Vitest)
+# Unit + Convex function tests (Vitest)
 npm run test
 
 # E2E tests (Playwright, requires app running)
@@ -69,6 +69,7 @@ All Convex mutations/queries are user-scoped via Clerk identity. Use `requireAut
 
 ## Testing
 
-- Unit tests: `tests/*.test.ts` - metrics/utility functions
+- Unit tests: `tests/*.test.ts` - metrics/utility functions (vitest project `unit`, Node env)
+- Convex function tests: `tests/convex/*.test.ts` - queries/mutations run against an in-memory backend via `convex-test` (vitest project `convex`, edge-runtime env). Use `setup()` and fixtures from `tests/convex/setup.ts`, `t.withIdentity({ subject: "user_a" })` for a Clerk user, `t.mutation(internal...)` for internal functions, and `vi.useFakeTimers()` + `t.finishAllScheduledFunctions(vi.runAllTimers)` for scheduled work. Run only these with `npx vitest run --project convex`. `convex-test` is pinned to 0.0.41, the last release compatible with convex 1.31; upgrade both together.
 - E2E tests: `tests/e2e/` - Playwright tests for full user flows
 - Playwright runs on chromium, firefox, webkit, plus mobile viewports

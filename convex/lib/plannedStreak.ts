@@ -1,4 +1,5 @@
 import { QueryCtx } from "../_generated/server";
+import { addDays, weekdayOf } from "./dates";
 
 /**
  * Get the set of weekdays (0=Sunday, 6=Saturday) that have workouts in the active plan.
@@ -52,9 +53,7 @@ export function isWorkoutDayForDate(
   dateStr: string,
   workoutWeekdays: Set<number>
 ): boolean {
-  const date = new Date(dateStr);
-  const weekday = date.getUTCDay();
-  return workoutWeekdays.has(weekday);
+  return workoutWeekdays.has(weekdayOf(dateStr));
 }
 
 /**
@@ -66,14 +65,10 @@ export function getPreviousWorkoutDate(
   workoutWeekdays: Set<number>,
   maxDaysBack: number = 14
 ): string | null {
-  const date = new Date(dateStr);
-
   for (let i = 1; i <= maxDaysBack; i++) {
-    date.setUTCDate(date.getUTCDate() - 1);
-    const weekday = date.getUTCDay();
-
-    if (workoutWeekdays.has(weekday)) {
-      return date.toISOString().split("T")[0];
+    const candidate = addDays(dateStr, -i);
+    if (workoutWeekdays.has(weekdayOf(candidate))) {
+      return candidate;
     }
   }
 
@@ -176,20 +171,4 @@ export async function computePlannedStreak(
   }
 
   return { streak, completedToday, isWorkoutToday };
-}
-
-/**
- * Get today's date in ISO format (YYYY-MM-DD) using UTC time.
- * 
- * WARNING: This returns the UTC date, which may differ from the user's local date
- * depending on their timezone. For user-facing features where the date attribution
- * matters (e.g., "did I work out today?"), consider passing the date from the
- * client where the user's local timezone is known.
- * 
- * For server-side streak calculations, this is acceptable since:
- * 1. Session dates are stored as UTC dates
- * 2. Consistency matters more than absolute accuracy for streak counting
- */
-export function getTodayDateStr(): string {
-  return new Date().toISOString().split("T")[0];
 }

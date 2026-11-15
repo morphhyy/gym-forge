@@ -1,9 +1,5 @@
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+// App-level domain helpers (formatting, weekdays, metrics).
+// `cn` lives in @/lib/utils, where shadcn (components.json) expects it.
 
 // Calculate estimated 1RM using Epley formula
 export function calculateE1RM(weight: number, reps: number): number {
@@ -52,64 +48,4 @@ export function getDayName(weekday: number): string {
 export function getShortDayName(weekday: number): string {
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   return days[weekday] ?? "???";
-}
-
-// Convert JS weekday (0=Sunday) to app weekday - identity function since we use same system
-export function jsWeekdayToAppWeekday(jsWeekday: number): number {
-  return jsWeekday;
-}
-
-// Deprecated: kept for backwards compatibility, use jsWeekdayToAppWeekday instead
-export function jsWeekdayToMonday(jsWeekday: number): number {
-  return jsWeekday;
-}
-
-// Generate progression suggestion
-export function getProgressionSuggestion(
-  recentWeights: number[],
-  recentReps: number[],
-  targetReps: number = 8,
-  weightUnit: "kg" | "lb" = "kg"
-): {
-  action: "increase" | "decrease" | "maintain";
-  reason: string;
-  amount?: number;
-} {
-  if (recentWeights.length < 2) {
-    return {
-      action: "maintain",
-      reason: "Keep training! Need more data for suggestions.",
-    };
-  }
-
-  const lastWeight = recentWeights[0];
-  const prevWeight = recentWeights[1];
-  const lastReps = recentReps[0];
-  const prevReps = recentReps[1];
-
-  const weightStable = Math.abs(lastWeight - prevWeight) < 5;
-  const hittingReps = lastReps >= targetReps && prevReps >= targetReps;
-  const struggling = lastReps < targetReps - 2 && prevReps < targetReps - 2;
-
-  if (weightStable && hittingReps) {
-    const increment = lastWeight > 100 ? 5 : 2.5;
-    return {
-      action: "increase",
-      amount: increment,
-      reason: `Consistent performance! Try adding ${increment} ${weightUnit}.`,
-    };
-  }
-
-  if (struggling) {
-    return {
-      action: "decrease",
-      amount: Math.round(lastWeight * 0.1),
-      reason: "Consider a 10% deload to work on form and reps.",
-    };
-  }
-
-  return {
-    action: "maintain",
-    reason: "Keep working at this weight. Progress takes time!",
-  };
 }

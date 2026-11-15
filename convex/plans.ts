@@ -1,8 +1,22 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, MutationCtx, query } from "./_generated/server";
 import { requireAuth, getAuthUserId } from "./auth";
 import { Id } from "./_generated/dataModel";
 import { nanoid } from "nanoid";
+import { weekdayOf } from "./lib/dates";
+import { assertUsableExercise } from "./lib/exerciseAccess";
+
+// Reject exerciseIds the caller can't use (another user's custom exercise).
+// Without this, a plan could reference someone else's custom exercise and
+// getPlanById / getTodayTemplate would then return its full document.
+async function assertPlanExercisesUsable(
+  ctx: MutationCtx,
+  userId: string,
+  days: { exercises: { exerciseId: Id<"exercises"> }[] }[]
+) {
+  const ids = new Set(days.flatMap((d) => d.exercises.map((e) => e.exerciseId)));
+  for (const id of ids) await assertUsableExercise(ctx, id, userId);
+}
 
 // Get user's active plan with all days and exercises
 export const getActivePlan = query({
@@ -123,9 +137,8 @@ export const getTodayTemplate = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    // Get weekday (0=Sunday, 6=Saturday - matches JS Date.getDay())
-    const dateObj = new Date(args.date);
-    const weekday = dateObj.getUTCDay();
+    // Weekday of the client's calendar date (0=Sunday, 6=Saturday), tz-independent
+    const weekday = weekdayOf(args.date);
 
     const plan = await ctx.db
       .query("plans")
@@ -168,6 +181,7 @@ export const getTodayTemplate = query({
 export const createPlan = mutation({
   args: {
     name: v.string(),
+    // Deprecated / ignored — kept optional so existing callers still validate.
     isAIGenerated: v.optional(v.boolean()),
     days: v.array(
       v.object({
@@ -192,20 +206,11 @@ export const createPlan = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
 
-    // If AI-generated plan, increment usage count (secure server-side increment)
-    if (args.isAIGenerated) {
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
-        .unique();
+    await assertPlanExercisesUsable(ctx, userId, args.days);
 
-      if (user) {
-        const currentUsage = user.aiUsageCount ?? 0;
-        await ctx.db.patch(user._id, {
-          aiUsageCount: currentUsage + 1,
-        });
-      }
-    }
+    // NOTE: `isAIGenerated` is intentionally ignored. AI usage is now charged
+    // server-side in ai.generateWorkoutPlan at generation time; trusting a
+    // client flag here allowed the limit to be bypassed by not saving.
 
     // Deactivate all existing plans
     const existingPlans = await ctx.db
@@ -295,6 +300,7 @@ export const updatePlan = mutation({
     if (!plan || plan.userId !== userId) {
       throw new Error("Plan not found");
     }
+    await assertPlanExercisesUsable(ctx, userId, args.days);
 
     // Update plan name
     await ctx.db.patch(args.planId, { name: args.name });

@@ -1,0 +1,8 @@
+"title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"
+"Pull","05 Sep 2024, 18:02","05 Sep 2024, 19:10","Back focus","Lat Pulldown (Cable)",,"",0,"warmup",30,12,,,
+"Pull","05 Sep 2024, 18:02","05 Sep 2024, 19:10","Back focus","Lat Pulldown (Cable)",,"",1,"normal",60,10,,,8
+"Pull","05 Sep 2024, 18:02","05 Sep 2024, 19:10","Back focus","Seated Cable Row - V Grip (Cable)",0,"",0,"normal",55,10,,,
+"Pull","05 Sep 2024, 18:02","05 Sep 2024, 19:10","Back focus","Face Pull",0,"",0,"normal",20,15,,,
+"Pull","05 Sep 2024, 18:02","05 Sep 2024, 19:10","Back focus","Dead Hang",,"",0,"normal",,,,45,
+"Legs","07 Sep 2024, 10:00","07 Sep 2024, 11:00","","Romanian Deadlift (Barbell)",,"slow eccentric",0,"normal",90,8,,,7.5
+"Legs","07 Sep 2024, 10:00","07 Sep 2024, 11:00","","Lying Leg Curl (Machine)",,"",0,"failure",40,12,,,10

@@ -1,13 +1,27 @@
 "use node";
 
 import { v } from "convex/values";
-import { action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { action, ActionCtx } from "./_generated/server";
+import { api, internal } from "./_generated/api";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
-const MAX_FREE_AI_USES = 2;
+const MAX_PROMPT_LENGTH = 2000;
+
+type GeneratedPlan = {
+  planName: string;
+  description: string;
+  days: Array<{
+    weekday: number;
+    name?: string;
+    exercises: Array<{
+      exerciseId: string;
+      exerciseName: string;
+      sets: Array<{ repsTarget: number; notes?: string }>;
+    }>;
+  }>;
+};
 
 // Define Zod schemas for structured output
 const ExerciseSchema = z.object({
@@ -47,24 +61,10 @@ const WorkoutPlanSchema = z.object({
 export const generateWorkoutPlan = action({
   args: {
     prompt: v.string(),
-    userId: v.string(),
+    // Unused: identity comes from ctx.auth. Kept optional for older clients.
+    userId: v.optional(v.string()),
   },
-  handler: async (
-    ctx,
-    args
-  ): Promise<{
-    planName: string;
-    description: string;
-    days: Array<{
-      weekday: number;
-      name?: string;
-      exercises: Array<{
-        exerciseId: string;
-        exerciseName: string;
-        sets: Array<{ repsTarget: number; notes?: string }>;
-      }>;
-    }>;
-  }> => {
+  handler: async (ctx, args): Promise<GeneratedPlan> => {
     const openaiApiKey = process.env.OPENAI_API_KEY;
 
     if (!openaiApiKey) {
@@ -73,37 +73,62 @@ export const generateWorkoutPlan = action({
       );
     }
 
-    // Check AI usage limit (increment happens when plan is saved, not generated)
-    const user = await ctx.runQuery(api.users.getCurrentUser);
-    if (!user) {
-      throw new Error("User not found");
+    // Validate input before any quota is consumed.
+    const prompt = args.prompt.trim();
+    if (!prompt) {
+      throw new Error("Please describe the plan you want.");
     }
-
-    const currentUsage = user.aiUsageCount ?? 0;
-    if (currentUsage >= MAX_FREE_AI_USES) {
+    if (prompt.length > MAX_PROMPT_LENGTH) {
       throw new Error(
-        `You've reached the free limit of ${MAX_FREE_AI_USES} AI-generated plans. Please create plans manually or upgrade to premium for unlimited AI plans.`
+        `Prompt is too long (max ${MAX_PROMPT_LENGTH} characters).`
       );
     }
 
-    // Get available exercises from the database
-    const exercises = await ctx.runQuery(api.exercises.getAllExercises);
+    // Usage is charged per generation (not per saved plan) so users can't
+    // bypass the limit by generating repeatedly without saving. The atomic
+    // check + increment happens inside generatePlanWithOpenAI right before the
+    // billed OpenAI call; it throws when the limit is reached (paid users are
+    // unlimited).
+    return await generatePlanWithOpenAI(ctx, openaiApiKey, prompt);
+  },
+});
 
-    // Group exercises by muscle group for better AI understanding
-    const exercisesByGroup: Record<string, string[]> = {};
-    exercises.forEach((e: { name: string; muscleGroup?: string }) => {
-      const group = e.muscleGroup || "Other";
-      if (!exercisesByGroup[group]) {
-        exercisesByGroup[group] = [];
-      }
-      exercisesByGroup[group].push(e.name);
-    });
+/**
+ * True only for failures where OpenAI did not return a completion and so
+ * (almost certainly) didn't bill us: network/timeout errors, 429, 5xx.
+ */
+function isUnbilledInfraError(err: unknown): boolean {
+  if (err instanceof OpenAI.APIConnectionError) return true; // includes timeouts
+  if (err instanceof OpenAI.APIError) {
+    const status = err.status;
+    return status === 429 || (typeof status === "number" && status >= 500);
+  }
+  return false;
+}
 
-    const exerciseList = Object.entries(exercisesByGroup)
-      .map(([group, names]) => `${group}: ${names.join(", ")}`)
-      .join("\n");
+async function generatePlanWithOpenAI(
+  ctx: ActionCtx,
+  openaiApiKey: string,
+  prompt: string
+): Promise<GeneratedPlan> {
+  // Get available exercises from the database
+  const exercises = await ctx.runQuery(api.exercises.getAllExercises);
 
-    const systemPrompt = `You are an elite strength and conditioning coach with 20+ years of experience training athletes and bodybuilders. Create scientifically-backed, personalized weekly workout plans.
+  // Group exercises by muscle group for better AI understanding
+  const exercisesByGroup: Record<string, string[]> = {};
+  exercises.forEach((e: { name: string; muscleGroup?: string }) => {
+    const group = e.muscleGroup || "Other";
+    if (!exercisesByGroup[group]) {
+      exercisesByGroup[group] = [];
+    }
+    exercisesByGroup[group].push(e.name);
+  });
+
+  const exerciseList = Object.entries(exercisesByGroup)
+    .map(([group, names]) => `${group}: ${names.join(", ")}`)
+    .join("\n");
+
+  const systemPrompt = `You are an elite strength and conditioning coach with 20+ years of experience training athletes and bodybuilders. Create scientifically-backed, personalized weekly workout plans.
 
 AVAILABLE EXERCISES BY MUSCLE GROUP:
 ${exerciseList}
@@ -146,17 +171,26 @@ EXERCISE ORDER (per session):
 
 Create a balanced, effective program that matches the user's goals, experience, and available training days.`;
 
-    // Initialize OpenAI client
-    const openai = new OpenAI({
-      apiKey: openaiApiKey,
-    });
+  // Initialize OpenAI client
+  const openai = new OpenAI({
+    apiKey: openaiApiKey,
+  });
 
-    // Use Responses API with structured output
-    const response = await openai.responses.parse({
+  // Reserve quota only now, immediately before the billed call, so failures in
+  // the (unbilled) preparation above never consume a generation.
+  const { consumed } = await ctx.runMutation(
+    internal.users.consumeAIGeneration,
+    {}
+  );
+
+  // Use Responses API with structured output
+  let response;
+  try {
+    response = await openai.responses.parse({
       model: "gpt-4o-2024-08-06",
       input: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: args.prompt },
+        { role: "user", content: prompt },
       ],
       text: {
         format: zodTextFormat(WorkoutPlanSchema, "workout_plan"),
@@ -164,47 +198,59 @@ Create a balanced, effective program that matches the user's goals, experience, 
       temperature: 0.7,
       max_output_tokens: 2000,
     });
-
-    if (!response.output_parsed) {
-      throw new Error("No parsed response from AI");
+  } catch (err) {
+    // Refund policy (fail-closed): only refund when OpenAI clearly did not
+    // return a completion — connection/timeout errors, 429, or 5xx. Anything
+    // else (parse/validation failures, refusals, content filter, truncation,
+    // 4xx caused by the input) may have been billed and is user-influenceable,
+    // so it is NOT refunded. Refunds are additionally capped per user per day
+    // in users.refundAIGeneration so even infra-error refunds can't be farmed.
+    if (consumed && isUnbilledInfraError(err)) {
+      await ctx.runMutation(internal.users.refundAIGeneration, {});
     }
+    throw err;
+  }
 
-    const plan = response.output_parsed;
+  // From here on the call was billed: no refunds for empty/invalid output.
+  if (!response.output_parsed) {
+    throw new Error("No parsed response from AI");
+  }
 
-    // Validate and map exercise names to IDs
-    const exerciseMap = new Map(
-      exercises.map((e: { _id: string; name: string }) => [
-        e.name.toLowerCase(),
-        e._id,
-      ])
-    );
+  const plan = response.output_parsed;
 
-    const mappedDays = plan.days.map((day) => ({
-      weekday: day.weekday,
-      name: day.label || day.dayName || undefined,
-      exercises: day.exercises
-        .map((ex) => {
-          const exerciseId = exerciseMap.get(ex.name.toLowerCase());
-          if (!exerciseId) {
-            console.warn(`Exercise not found: ${ex.name}`);
-            return null;
-          }
-          return {
-            exerciseId,
-            exerciseName: ex.name,
-            sets: Array.from({ length: ex.sets }, () => ({
-              repsTarget: ex.reps,
-              notes: ex.notes ?? undefined,
-            })),
-          };
-        })
-        .filter((ex): ex is NonNullable<typeof ex> => ex !== null),
-    }));
+  // Validate and map exercise names to IDs
+  const exerciseMap = new Map(
+    exercises.map((e: { _id: string; name: string }) => [
+      e.name.toLowerCase(),
+      e._id,
+    ])
+  );
 
-    return {
-      planName: plan.planName || "AI Generated Plan",
-      description: plan.description,
-      days: mappedDays,
-    };
-  },
-});
+  const mappedDays = plan.days.map((day) => ({
+    weekday: day.weekday,
+    name: day.label || day.dayName || undefined,
+    exercises: day.exercises
+      .map((ex) => {
+        const exerciseId = exerciseMap.get(ex.name.toLowerCase());
+        if (!exerciseId) {
+          console.warn(`Exercise not found: ${ex.name}`);
+          return null;
+        }
+        return {
+          exerciseId,
+          exerciseName: ex.name,
+          sets: Array.from({ length: ex.sets }, () => ({
+            repsTarget: ex.reps,
+            notes: ex.notes ?? undefined,
+          })),
+        };
+      })
+      .filter((ex): ex is NonNullable<typeof ex> => ex !== null),
+  }));
+
+  return {
+    planName: plan.planName || "AI Generated Plan",
+    description: plan.description,
+    days: mappedDays,
+  };
+}

@@ -93,7 +93,7 @@ export function AIPlanGenerator({
     setError(null);
 
     try {
-      const plan = await generatePlan({ prompt: prompt.trim(), userId });
+      const plan = await generatePlan({ prompt: prompt.trim() });
       setGeneratedPlan(plan as GeneratedPlan);
     } catch (err) {
       const errorMessage =
@@ -171,10 +171,13 @@ export function AIPlanGenerator({
                     >
                       {aiUsage.isLimitReached
                         ? "Limit Reached"
-                        : `${aiUsage.remaining} of ${aiUsage.limit} free AI plans remaining`}
+                        : aiUsage.isUnlimited
+                          ? "Unlimited AI plans"
+                          : `${aiUsage.remaining} of ${aiUsage.limit} free AI plans remaining`}
                     </p>
-                    {!aiUsage.isLimitReached && (
+                    {!aiUsage.isLimitReached && !aiUsage.isUnlimited && (
                       <p className="text-xs text-muted-foreground mt-0.5">
+                        Each generation (including regenerate) uses one.
                         You&apos;ve used {aiUsage.usageCount} AI generation
                         {aiUsage.usageCount !== 1 ? "s" : ""}
                       </p>
@@ -233,6 +236,7 @@ export function AIPlanGenerator({
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="e.g., I'm an intermediate lifter looking to build muscle. I can train 5 days a week and want to focus on upper body while maintaining legs. I prefer compound movements and have about 60 minutes per session."
                 rows={5}
+                maxLength={2000}
                 disabled={isGenerating}
               />
               <p className="text-xs text-muted-foreground mt-2">

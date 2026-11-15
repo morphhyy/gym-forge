@@ -33,6 +33,12 @@ export default defineSchema({
     isGlobal: v.boolean(),
     userId: v.optional(v.string()), // null for global exercises
     createdAt: v.number(),
+    // Exercise library details (optional; backfilled for global exercises)
+    instructions: v.optional(v.array(v.string())),
+    primaryMuscles: v.optional(v.array(v.string())),
+    secondaryMuscles: v.optional(v.array(v.string())),
+    alternatives: v.optional(v.array(v.string())), // exercise names
+    gifUrl: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_global", ["isGlobal"]),
@@ -84,6 +90,26 @@ export default defineSchema({
     weekday: v.optional(v.number()),
     completedAt: v.optional(v.number()),
     notes: v.optional(v.string()),
+    // When the workout started (session creation or first logged set)
+    startedAt: v.optional(v.number()),
+    // Warm-up / cool-down ticked off in the logger (absent = not done)
+    warmupCompletedAt: v.optional(v.number()),
+    cooldownCompletedAt: v.optional(v.number()),
+    // Session-level exercise list snapshot. Absent = derived from the plan
+    // template + logged sets. See convex/lib/sessionExercises.ts.
+    exercises: v.optional(
+      v.array(
+        v.object({
+          key: v.string(),
+          exerciseId: v.id("exercises"),
+          planExerciseId: v.optional(v.id("planExercises")),
+          sets: v.array(v.object({ repsTarget: v.optional(v.number()) })),
+          supersetGroup: v.optional(v.string()),
+          restSeconds: v.optional(v.number()),
+          swappedFromExerciseId: v.optional(v.id("exercises")),
+        })
+      )
+    ),
     createdAt: v.number(),
   })
     .index("by_user", ["userId"])
@@ -92,15 +118,29 @@ export default defineSchema({
   // Individual sets logged in a session
   sessionSets: defineTable({
     sessionId: v.id("sessions"),
+    // Denormalised owner (Clerk ID) so per-exercise history doesn't need a
+    // query per session. Optional: rows written before this field existed
+    // don't have it (see sessions.backfillSessionSetUserIds).
+    userId: v.optional(v.string()),
     exerciseId: v.id("exercises"),
     setIndex: v.number(),
     repsActual: v.number(),
     weight: v.number(),
     rpe: v.optional(v.number()), // Rate of Perceived Exertion (1-10)
+    // Absent = "normal". Warm-up sets are excluded from volume/e1RM/PRs.
+    setType: v.optional(
+      v.union(
+        v.literal("normal"),
+        v.literal("warmup"),
+        v.literal("drop"),
+        v.literal("failure")
+      )
+    ),
     createdAt: v.number(),
   })
     .index("by_session", ["sessionId"])
-    .index("by_session_exercise", ["sessionId", "exerciseId"]),
+    .index("by_session_exercise", ["sessionId", "exerciseId"])
+    .index("by_user_exercise", ["userId", "exerciseId"]),
 
   // Achievement badges for gamification
   achievements: defineTable({

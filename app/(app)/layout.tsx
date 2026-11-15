@@ -14,6 +14,8 @@ import {
   User,
 } from "lucide-react";
 import { DumbbellIcon } from "@/app/components/dumbbell-icon";
+import { ConnectionIndicator } from "@/app/components/connection-indicator";
+import { InstallPrompt } from "@/app/components/install-prompt";
 
 const navItems = [
   { href: "/dashboard", label: "Home", icon: Home },
@@ -37,6 +39,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
+      <ConnectionIndicator />
+      <InstallPrompt />
       {/* Mobile Header */}
       <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <Link href="/dashboard" className="flex items-center gap-2">

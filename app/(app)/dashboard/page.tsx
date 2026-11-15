@@ -16,15 +16,16 @@ import {
 import { format } from "date-fns";
 import { StreakBadge } from "@/app/components/streak-badge";
 import { WeeklyProgressRing } from "@/app/components/weekly-progress-ring";
+import { WeeklyRecap } from "@/app/components/weekly-recap";
 
 export default function DashboardPage() {
   const today = format(new Date(), "yyyy-MM-dd");
   const activePlan = useQuery(api.plans.getActivePlan);
   const todayTemplate = useQuery(api.plans.getTodayTemplate, { date: today });
-  const weeklyStats = useQuery(api.progress.getWeeklySummary, { weeks: 4 });
+  const weeklyStats = useQuery(api.progress.getWeeklySummary, { weeks: 4, today });
   const userData = useQuery(api.users.getCurrentUser);
-  const streakData = useQuery(api.streaks.getStreakData);
-  const streakStatus = useQuery(api.streaks.getStreakStatus);
+  const streakData = useQuery(api.streaks.getStreakData, { today });
+  const streakStatus = useQuery(api.streaks.getStreakStatus, { today });
   const userAchievements = useQuery(api.streaks.getUserAchievements);
   const latestWeight = useQuery(api.bodyWeight.getLatestWeight);
 
@@ -105,6 +106,9 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Weekly Recap (dismissible) */}
+      <WeeklyRecap today={today} />
 
       {/* Quick Actions */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

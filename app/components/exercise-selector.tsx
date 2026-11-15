@@ -4,7 +4,8 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Search, Plus, Check, Dumbbell } from "lucide-react";
+import Link from "next/link";
+import { Search, Plus, Check, Dumbbell, Info } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -26,12 +27,14 @@ interface ExerciseSelectorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (exerciseId: Id<"exercises">, exerciseName: string) => void;
+  title?: string;
 }
 
 export function ExerciseSelector({
   open,
   onOpenChange,
   onSelect,
+  title = "Add Exercise",
 }: ExerciseSelectorProps) {
   const [search, setSearch] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -113,7 +116,7 @@ export function ExerciseSelector({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Add Exercise</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
 
         {!showCreateForm ? (
@@ -162,28 +165,43 @@ export function ExerciseSelector({
                         </h3>
                         <div className="space-y-1">
                           {groupExercises.map((exercise: Exercise) => (
-                            <button
+                            <div
                               key={exercise._id}
-                              onClick={() =>
-                                handleSelect(
-                                  exercise._id as Id<"exercises">,
-                                  exercise.name
-                                )
-                              }
-                              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-accent transition-colors text-left group"
+                              className="flex items-center gap-1"
                             >
-                              <div>
-                                <span className="font-medium">
-                                  {exercise.name}
-                                </span>
-                                {exercise.equipment && (
-                                  <span className="text-muted-foreground text-sm ml-2">
-                                    ({exercise.equipment})
+                              <button
+                                onClick={() =>
+                                  handleSelect(
+                                    exercise._id as Id<"exercises">,
+                                    exercise.name
+                                  )
+                                }
+                                className="flex-1 min-w-0 flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-accent transition-colors text-left group"
+                              >
+                                <div>
+                                  <span className="font-medium">
+                                    {exercise.name}
                                   </span>
-                                )}
-                              </div>
-                              <Check className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </button>
+                                  {exercise.equipment && (
+                                    <span className="text-muted-foreground text-sm ml-2">
+                                      ({exercise.equipment})
+                                    </span>
+                                  )}
+                                </div>
+                                <Check className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </button>
+                              {/* New tab so unsaved plan edits in the parent aren't lost */}
+                              <Link
+                                href={`/exercises/${exercise._id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`About ${exercise.name}`}
+                                title="Exercise details"
+                                className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                              >
+                                <Info className="w-4 h-4" />
+                              </Link>
+                            </div>
                           ))}
                         </div>
                       </div>

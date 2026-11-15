@@ -1,8 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { requireAuth, getAuthUserId } from "./auth";
-
-const MAX_FREE_AI_USES = 1;
+import { MAX_FREE_AI_USES } from "./lib/aiLimits";
 
 // Get current user's profile
 export const getCurrentUser = query({
@@ -25,6 +24,9 @@ export const upsertProfile = mutation({
     displayName: v.optional(v.string()),
     units: v.optional(v.union(v.literal("kg"), v.literal("lb"))),
     goals: v.optional(v.string()),
+    defaultRestSeconds: v.optional(v.number()),
+    restTimerSound: v.optional(v.boolean()),
+    restTimerVibrate: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
@@ -35,11 +37,22 @@ export const upsertProfile = mutation({
       .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
       .unique();
 
+    const defaultRestSeconds =
+      args.defaultRestSeconds === undefined || !Number.isFinite(args.defaultRestSeconds)
+        ? undefined
+        : Math.min(Math.max(Math.round(args.defaultRestSeconds), 0), 900);
+    const restPrefs = {
+      ...(defaultRestSeconds !== undefined && { defaultRestSeconds }),
+      ...(args.restTimerSound !== undefined && { restTimerSound: args.restTimerSound }),
+      ...(args.restTimerVibrate !== undefined && { restTimerVibrate: args.restTimerVibrate }),
+    };
+
     if (existingUser) {
       await ctx.db.patch(existingUser._id, {
         displayName: args.displayName ?? existingUser.displayName,
         units: args.units ?? existingUser.units,
         goals: args.goals ?? existingUser.goals,
+        ...restPrefs,
       });
       return existingUser._id;
     } else {
@@ -49,6 +62,7 @@ export const upsertProfile = mutation({
         displayName: args.displayName,
         units: args.units ?? "kg",
         goals: args.goals,
+        ...restPrefs,
         aiUsageCount: 0,
         createdAt: Date.now(),
       });
@@ -103,10 +117,13 @@ export const setUserPaidStatus = internalMutation({
   },
 });
 
-// Increment AI usage count
-export const incrementAIUsage = mutation({
+// Atomically reserve one AI plan generation for the authenticated user.
+// Called from the generateWorkoutPlan action BEFORE the OpenAI request.
+// Convex mutations are serializable, so concurrent calls cannot both pass the
+// check and push the count over the limit.
+export const consumeAIGeneration = internalMutation({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ consumed: boolean }> => {
     const userId = await requireAuth(ctx);
 
     const user = await ctx.db
@@ -118,12 +135,71 @@ export const incrementAIUsage = mutation({
       throw new Error("User not found");
     }
 
-    const currentUsage = user.aiUsageCount ?? 0;
-    await ctx.db.patch(user._id, {
-      aiUsageCount: currentUsage + 1,
-    });
+    // Paid users are unlimited; their usage isn't counted against the free quota.
+    if (user.isPaidUser) {
+      return { consumed: false };
+    }
 
-    return { usageCount: currentUsage + 1 };
+    const currentUsage = user.aiUsageCount ?? 0;
+    if (currentUsage >= MAX_FREE_AI_USES) {
+      throw new Error(
+        `You've reached the free limit of ${MAX_FREE_AI_USES} AI-generated plan${MAX_FREE_AI_USES === 1 ? "" : "s"}. Please create plans manually or upgrade to premium for unlimited AI plans.`
+      );
+    }
+
+    await ctx.db.patch(user._id, { aiUsageCount: currentUsage + 1 });
+    return { consumed: true };
+  },
+});
+
+const MAX_AI_REFUNDS_PER_DAY = 3;
+const AI_REFUND_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// Give back a reserved generation. Only called by ai.generateWorkoutPlan for
+// clearly-unbilled infrastructure failures (network error, 429, 5xx) — never
+// for parse/validation failures or refusals. Capped at MAX_AI_REFUNDS_PER_DAY
+// per user (tracked in rateLimits) so refunds can't be farmed for unlimited
+// OpenAI calls. Returns whether a refund was granted.
+export const refundAIGeneration = internalMutation({
+  args: {},
+  handler: async (ctx): Promise<{ refunded: boolean }> => {
+    const userId = await requireAuth(ctx);
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
+      .unique();
+
+    if (!user || user.isPaidUser) return { refunded: false };
+
+    const currentUsage = user.aiUsageCount ?? 0;
+    if (currentUsage <= 0) return { refunded: false };
+
+    const now = Date.now();
+    const limit = await ctx.db
+      .query("rateLimits")
+      .withIndex("by_identifier_action", (q) =>
+        q.eq("identifier", userId).eq("action", "ai_plan_refund")
+      )
+      .first();
+
+    if (!limit) {
+      await ctx.db.insert("rateLimits", {
+        identifier: userId,
+        action: "ai_plan_refund",
+        count: 1,
+        windowStart: now,
+      });
+    } else if (now - limit.windowStart >= AI_REFUND_WINDOW_MS) {
+      await ctx.db.patch(limit._id, { count: 1, windowStart: now });
+    } else if (limit.count >= MAX_AI_REFUNDS_PER_DAY) {
+      return { refunded: false };
+    } else {
+      await ctx.db.patch(limit._id, { count: limit.count + 1 });
+    }
+
+    await ctx.db.patch(user._id, { aiUsageCount: currentUsage - 1 });
+    return { refunded: true };
   },
 });
 
@@ -137,6 +213,8 @@ export const getAIUsage = query({
         usageCount: 0,
         remaining: MAX_FREE_AI_USES,
         limit: MAX_FREE_AI_USES,
+        isLimitReached: false,
+        isUnlimited: false,
       };
     }
 
@@ -150,10 +228,23 @@ export const getAIUsage = query({
         usageCount: 0,
         remaining: MAX_FREE_AI_USES,
         limit: MAX_FREE_AI_USES,
+        isLimitReached: false,
+        isUnlimited: false,
       };
     }
 
     const usageCount = user.aiUsageCount ?? 0;
+
+    if (user.isPaidUser) {
+      return {
+        usageCount,
+        remaining: MAX_FREE_AI_USES,
+        limit: MAX_FREE_AI_USES,
+        isLimitReached: false,
+        isUnlimited: true,
+      };
+    }
+
     const remaining = Math.max(0, MAX_FREE_AI_USES - usageCount);
 
     return {
@@ -161,6 +252,7 @@ export const getAIUsage = query({
       remaining,
       limit: MAX_FREE_AI_USES,
       isLimitReached: usageCount >= MAX_FREE_AI_USES,
+      isUnlimited: false,
     };
   },
 });
