@@ -144,6 +144,20 @@ describe("account deletion", () => {
     expect((await a.query(api.users.getAIUsage, {})).usageCount).toBe(1);
   });
 
+  test("AI plans generated while deletion is in progress still count", async () => {
+    const t = setup();
+    await createUser(t, "user_a", { aiUsageCount: 0 });
+    const a = t.withIdentity(USER_A);
+
+    // Request deletion, then generate before the scheduled steps run
+    await a.mutation(api.account.requestAccountDeletion, { confirmation: "DELETE" });
+    expect(await a.mutation(internal.users.consumeAIGeneration, {})).toEqual({ consumed: true });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    await a.mutation(api.users.ensureUser, {});
+    expect((await a.query(api.users.getAIUsage, {})).usageCount).toBe(1);
+  });
+
   test("a fresh user still starts at 0", async () => {
     const t = setup();
     const b = t.withIdentity(USER_B);
