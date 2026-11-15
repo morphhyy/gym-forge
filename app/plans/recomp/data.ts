@@ -3,6 +3,8 @@
  * Mirrors the downloadable PDF. Numbers are examples for an ~80 kg lifter.
  */
 
+import { RECOMP_ROUTINES, type DayRoutine } from "@/app/lib/workout-routines";
+
 export const PLAN_PDF_URL = "/plans/recomp/gymforge-5-day-recomp-plan.pdf";
 /** `?template=` id that opens this plan prefilled in the plan editor. */
 export const RECOMP_TEMPLATE_ID = "recomp-5-day";
@@ -91,10 +93,10 @@ export const split: SplitDay[] = [
   { short: "Sun", label: "Push", focus: "Chest · delts · triceps", kind: "pump" },
   { short: "Mon", label: "Pull", focus: "Back · rear delts · biceps", kind: "pump" },
   { short: "Tue", label: "Legs", focus: "Quads · glutes · hamstrings", kind: "pump" },
-  { short: "Wed", label: "Rest", focus: "30 min zone-2 walk or bike", kind: "rest" },
+  { short: "Wed", label: "Rest", focus: "30–40 min zone-2 walk or bike", kind: "rest" },
   { short: "Thu", label: "Upper", focus: "Heavy, 5–8 reps", kind: "heavy" },
   { short: "Fri", label: "Lower", focus: "Heavy, 5–8 reps", kind: "heavy" },
-  { short: "Sat", label: "Rest", focus: "Active rest, walk only", kind: "rest" },
+  { short: "Sat", label: "Rest", focus: "45–60 min walk or hike", kind: "rest" },
 ];
 
 export const whyThisSplit: string[] = [
@@ -220,9 +222,110 @@ export const workouts: Workout[] = [
 export const progression: { title: string; body: string }[] = [
   { title: "Effort", body: "End most sets with 1–2 reps left. On isolation exercises, take the last set to 0–1 reps left." },
   { title: "Double progression", body: "Once you hit the top of the rep range on every set, add 2.5 kg (upper) or 5 kg (lower) and work back up from the bottom of the range." },
-  { title: "Warm-up", body: "5 min bike, then 2–3 lighter ramp-up sets on the first exercise." },
+  { title: "Warm-up & cool-down", body: "Every workout above has its own routine. Never skip the ramp-up sets." },
   { title: "8-week block", body: "Weeks 1–6 push progression. Week 7 deload: half the sets, same weights. Week 8 test rep maxes, then start a new block." },
 ];
+
+// ------------------------------------------------------- warm-up & cool-down
+
+/** A workout's warm-up and cool-down (shared with the plan template). */
+export function workoutRoutine(workout: Workout): DayRoutine {
+  return RECOMP_ROUTINES[workout.weekdayIndex];
+}
+
+export interface SessionBlock {
+  label: string;
+  time: string;
+  kind: "warmup" | "lift" | "cooldown" | "cardio";
+  /** Relative width in the session bar. */
+  grow: number;
+}
+
+export const sessionStructure: SessionBlock[] = [
+  { label: "Warm-up", time: "8–10 min", kind: "warmup", grow: 2 },
+  { label: "Lifting · 6 exercises", time: "~55 min", kind: "lift", grow: 9 },
+  { label: "Cool-down", time: "5–7 min", kind: "cooldown", grow: 1.5 },
+  { label: "Cardio (optional)", time: "15–20 min", kind: "cardio", grow: 2 },
+];
+
+export const sessionNote =
+  "Total ~70 min, or ~90 min on days with cardio. Ramp-up sets count as warm-up: they're light, never to failure, and don't count toward your working sets.";
+
+export const whyWarmup: { lead: string; body: string }[] = [
+  { lead: "Warm-up", body: "raises muscle temperature and grooves the movement, so your first working set is strong and safe." },
+  { lead: "Ramp-up sets", body: "are how you find the right working weight for the day." },
+  { lead: "Cool-down", body: "brings your heart rate down and keeps your hips, chest and shoulders mobile. That matters a lot when you sit all day." },
+  { lead: "Short on time?", body: "Keep the ramp-up sets. Cut the stretches, not the warm-up." },
+];
+
+// ------------------------------------------------------------------- cardio
+
+export const cardioHeadline: { value: string; unit: string; label: string }[] = [
+  { value: "8–10k", unit: "steps", label: "Every day" },
+  { value: "2–4", unit: "zone-2 sessions", label: "Weekly" },
+  { value: "1", unit: "interval session", label: "Optional, from week 4" },
+];
+
+export interface HeartRateZone {
+  zone: string;
+  range: string;
+  feel: string;
+  target?: boolean;
+}
+
+export const heartRateZones: HeartRateZone[] = [
+  { zone: "Z1", range: "50–60%", feel: "Walking" },
+  { zone: "Z2", range: "60–70%", feel: "Can talk in full sentences", target: true },
+  { zone: "Z3", range: "70–80%", feel: "Short phrases only" },
+  { zone: "Z4", range: "80–90%", feel: "A few words" },
+  { zone: "Z5", range: "90%+", feel: "Can't talk" },
+];
+
+export const zone2Note =
+  "Max heart rate ≈ 220 − your age. Zone 2 is 60–70% of that. At age 30 that's about 115–135 bpm. No watch? Use the talk test: you can talk in full sentences but wouldn't want to sing.";
+
+export interface CardioDay {
+  day: string;
+  gym: string;
+  cardio: string;
+  how: string;
+  /** When to start; null = no cardio that day. */
+  start: string | null;
+  /** Standalone session (not after lifting). */
+  key?: boolean;
+}
+
+export const cardioWeek: CardioDay[] = [
+  { day: "Sun", gym: "Push", cardio: "15–20 min after lifting", how: "Incline treadmill 10–12%, 5–5.5 km/h, hands off rails", start: "Week 5" },
+  { day: "Mon", gym: "Pull", cardio: "15–20 min after lifting", how: "Bike or rower, steady easy pace", start: "If fat loss stalls" },
+  { day: "Tue", gym: "Legs", cardio: "None", how: "Recovery. Daily steps only", start: null },
+  { day: "Wed", gym: "Rest", cardio: "30–40 min zone 2", how: "Brisk walk or cycling (intervals option from week 4)", start: "Week 1", key: true },
+  { day: "Thu", gym: "Upper", cardio: "15 min after lifting", how: "Incline walk or bike", start: "Week 5" },
+  { day: "Fri", gym: "Lower", cardio: "None", how: "Heavy leg day. Steps only", start: null },
+  { day: "Sat", gym: "Rest", cardio: "45–60 min walk / hike", how: "Outdoors, easy hills, bring friends or family", start: "Week 1", key: true },
+];
+
+export const intervalSession = {
+  when: "Wednesday only, from week 4, if you're recovering well.",
+  steps: [
+    "5 min easy pedalling",
+    "20 s all-out + 100 s slow. Repeat 6–8 rounds on a bike or rower",
+    "5 min easy, ~25 min in total",
+  ],
+};
+
+export type MachineVerdict = "best" | "good" | "careful" | "skip";
+
+export const cardioMachines: { verdict: MachineVerdict; name: string; note: string }[] = [
+  { verdict: "best", name: "Incline walk", note: "low fatigue, easy to keep in zone 2" },
+  { verdict: "best", name: "Bike", note: "easy on the knees, good for intervals" },
+  { verdict: "good", name: "Rower", note: "full body. Keep your back flat" },
+  { verdict: "careful", name: "Stair climber", note: "tires the legs, so avoid it before Legs or Lower" },
+  { verdict: "skip", name: "Running", note: "while you're heavy and lifting 5×: it's hard on the joints" },
+];
+
+export const cardioRules =
+  "Lift first, cardio after. Never do hard cardio the day before Legs or Lower. If fat loss stalls for 2 weeks, add 2k steps or 10 min of zone 2 before cutting food. Steps matter more than any single cardio session.";
 
 // ---------------------------------------------------------------- nutrition
 

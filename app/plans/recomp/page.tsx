@@ -3,43 +3,61 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
+  Bike,
   CalendarDays,
   CheckCircle2,
   Download,
   Dumbbell,
   Flame,
   Footprints,
+  HeartPulse,
   ListPlus,
   Moon,
   Repeat,
+  Snowflake,
+  Sun,
   Timer,
   TrendingUp,
   UtensilsCrossed,
+  Zap,
 } from "lucide-react";
 import { DumbbellIcon } from "@/app/components/dumbbell-icon";
 import {
   PLAN_PDF_FILENAME,
   PLAN_PDF_URL,
   USE_PLAN_URL,
+  cardioHeadline,
+  cardioMachines,
+  cardioRules,
+  cardioWeek,
   deskFixes,
   exerciseGifSrc,
+  heartRateZones,
+  intervalSession,
   keyRules,
   kitchenRules,
   mealPlan,
   nutrition,
   progression,
+  sessionNote,
+  sessionStructure,
   split,
   swaps,
   whyThisSplit,
+  whyWarmup,
+  workoutRoutine,
+  zone2Note,
   workouts,
   type DayKind,
+  type MachineVerdict,
+  type SessionBlock,
   type Exercise,
   type MealPlanDay,
   type Workout,
 } from "./data";
 
 const description =
-  "A free 5-day push/pull/legs + upper/lower recomp plan with animated exercise demos, calorie and macro targets, and a 7-day Nepali meal plan. Built for going from ~80 kg to 72 kg while building muscle.";
+  "A free 5-day push/pull/legs + upper/lower recomp plan with animated exercise demos, a warm-up and cool-down for every session, a zone-2 cardio plan, calorie and macro targets, and a 7-day Nepali meal plan. Built for going from ~80 kg to 72 kg while building muscle.";
 
 export const metadata: Metadata = {
   title: "Free 5-Day Recomp Plan - GymForge",
@@ -109,8 +127,63 @@ function ExerciseCard({ exercise, index }: { exercise: Exercise; index: number }
   );
 }
 
+const blockStyle: Record<SessionBlock["kind"], string> = {
+  warmup: "bg-amber-500/80 text-black",
+  lift: "bg-primary text-primary-foreground",
+  cooldown: "bg-sky-500/80 text-black",
+  cardio: "border border-dashed border-rose-400/70 text-rose-300",
+};
+
+function SessionBar() {
+  return (
+    <div className="card mb-10">
+      {/* 2×2 grid on phones; a proportional timeline from sm up (flex-grow is ignored in grid) */}
+      <div className="grid grid-cols-2 gap-2 sm:flex">
+        {sessionStructure.map((b) => (
+          <div key={b.kind} className="min-w-0" style={{ flexGrow: b.grow, flexBasis: 0 }}>
+            <div
+              className={`min-h-9 py-1.5 rounded-lg flex items-center justify-center px-2 text-[11px] sm:text-xs font-semibold uppercase tracking-wide text-center ${blockStyle[b.kind]}`}
+            >
+              <span className="sm:truncate">
+                <span className="sm:hidden">{b.label}</span>
+                <span className="hidden sm:inline">
+                  {b.kind === "lift" ? b.label : b.label.replace(" (optional)", "")}
+                </span>
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground text-center mt-1.5 sm:truncate">{b.time}</div>
+          </div>
+        ))}
+      </div>
+      <p className="text-sm text-muted-foreground mt-4">{sessionNote}</p>
+    </div>
+  );
+}
+
+function RoutineCard({ kind, steps }: { kind: "warmup" | "cooldown"; steps: string[] }) {
+  const warm = kind === "warmup";
+  const Icon = warm ? Sun : Snowflake;
+  return (
+    <div className={`rounded-xl border p-4 ${warm ? "border-amber-500/30 bg-amber-500/5" : "border-sky-500/30 bg-sky-500/5"}`}>
+      <div className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-3 ${warm ? "text-amber-400" : "text-sky-400"}`}>
+        <Icon className="w-4 h-4" />
+        {warm ? "Warm-up · 8–10 min" : "Cool-down · 5–7 min"}
+      </div>
+      <ol className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+        {steps.map((step, i) => (
+          <li key={step} className="flex gap-2">
+            <span className="text-muted-foreground tabular-nums w-4 flex-shrink-0">{i + 1}.</span>
+            <span className={step.startsWith("Ramp-up") ? "font-medium" : "text-muted-foreground"}>{step}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function WorkoutBlock({ workout, day }: { workout: Workout; day: number }) {
   const style = kindStyle[workout.kind];
+  const routine = workoutRoutine(workout);
   return (
     <div id={workout.id} className="scroll-mt-24">
       <div className="flex flex-wrap items-center gap-3 mb-2">
@@ -121,11 +194,13 @@ function WorkoutBlock({ workout, day }: { workout: Workout; day: number }) {
         <span className={`${pill} ${style.badge}`}>{style.label}</span>
       </div>
       <p className="text-muted-foreground mb-5">{workout.summary}</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <RoutineCard kind="warmup" steps={routine.warmup} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 my-4">
         {workout.exercises.map((exercise, i) => (
           <ExerciseCard key={exercise.gif} exercise={exercise} index={i + 1} />
         ))}
       </div>
+      <RoutineCard kind="cooldown" steps={routine.cooldown} />
     </div>
   );
 }
@@ -292,9 +367,13 @@ export default function RecompPlanPage() {
                 <Footprints className="w-4 h-4 text-primary" /> Cardio &amp; steps
               </h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><span className="text-foreground font-medium">Daily:</span> 8–10k steps. Walk 10 min after each meal.</li>
-                <li><span className="text-foreground font-medium">2–3× a week:</span> 20–30 min zone 2 (incline walk or bike), after lifting or on Wednesday.</li>
-                <li><span className="text-foreground font-medium">Avoid:</span> hard intervals the day before Legs or Lower.</li>
+                <li><span className="text-foreground font-medium">Daily:</span> 8–10k steps. Walk 10 min after each meal and take calls walking.</li>
+                <li>
+                  <span className="text-foreground font-medium">2–4× a week:</span> zone-2 cardio. Wed + Sat from week 1,
+                  post-lift sessions added later.{" "}
+                  <a href="#cardio" className="text-primary hover:underline">Full cardio plan</a>
+                </li>
+                <li><span className="text-foreground font-medium">Avoid:</span> hard intervals the day before Lower or Legs.</li>
               </ul>
             </div>
           </div>
@@ -307,6 +386,7 @@ export default function RecompPlanPage() {
           <SectionHeading eyebrow="Workouts" title={`5 sessions · ${totalExercises} exercises`}>
             Each exercise has a looping demo of one rep. Light-blue limbs are the far-side arm or leg.
           </SectionHeading>
+          <SessionBar />
           <div className="space-y-14">
             {workouts.map((w, i) => (
               <WorkoutBlock key={w.id} workout={w} day={i + 1} />
@@ -325,9 +405,24 @@ export default function RecompPlanPage() {
                 </div>
               ))}
             </div>
+            <div className="card mt-4">
+              <div className="font-semibold mb-3">Why warm up and cool down?</div>
+              <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-2">
+                {whyWarmup.map((w) => (
+                  <li key={w.lead} className="flex gap-2 text-sm text-muted-foreground">
+                    <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+                    <span>
+                      <span className="text-foreground font-medium">{w.lead}</span> {w.body}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </section>
+
+      <CardioSection />
 
       {/* Nutrition */}
       <section id="nutrition" className="scroll-mt-16 py-16 sm:py-20 px-4 sm:px-6 bg-card/50 border-y border-border">
@@ -477,5 +572,149 @@ export default function RecompPlanPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+const verdictStyle: Record<MachineVerdict, string> = {
+  best: "bg-primary-muted text-primary",
+  good: "bg-sky-500/15 text-sky-400",
+  careful: "bg-amber-500/15 text-amber-400",
+  skip: "bg-rose-500/15 text-rose-400",
+};
+
+function CardioSection() {
+  return (
+    <section id="cardio" className="scroll-mt-16 py-16 sm:py-20 px-4 sm:px-6 border-t border-border">
+      <div className="max-w-6xl mx-auto">
+        <SectionHeading eyebrow="Cardio" title="Cardio plan: what to do">
+          Steps every day, easy zone-2 sessions a few times a week, and intervals only once you&apos;re recovering well.
+        </SectionHeading>
+
+        <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
+          {cardioHeadline.map((h) => (
+            <div key={h.label} className="card">
+              <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{h.label}</dt>
+              <dd className="mt-1">
+                <span className="text-2xl sm:text-3xl font-bold text-primary">{h.value}</span>{" "}
+                <span className="text-sm text-muted-foreground">{h.unit}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className="card mb-6">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <HeartPulse className="w-4 h-4 text-primary" /> Zone 2: the easy pace that burns fat
+          </h3>
+          <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+            {heartRateZones.map((z) => (
+              <div key={z.zone} className="min-w-0">
+                <div
+                  className={`rounded-lg py-2 text-center text-[11px] sm:text-sm font-semibold ${
+                    z.target ? "bg-primary text-primary-foreground" : "bg-background border border-border text-muted-foreground"
+                  }`}
+                >
+                  {z.zone}
+                  <span className="hidden sm:inline"> · {z.range}</span>
+                  <span className="block sm:hidden text-[10px] font-normal">{z.range}</span>
+                </div>
+                <div className={`text-[11px] sm:text-xs text-center mt-1.5 ${z.target ? "text-primary font-medium" : "text-muted-foreground"}`}>
+                  {z.feel}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground mt-4">{zone2Note}</p>
+        </div>
+
+        <div className="card mb-6">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-primary" /> Your cardio week
+          </h3>
+          {/* Table on wider screens, stacked rows on phones */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
+                  <th className="py-2 pr-4 font-semibold">Day</th>
+                  <th className="py-2 pr-4 font-semibold">Gym</th>
+                  <th className="py-2 pr-4 font-semibold">Cardio</th>
+                  <th className="py-2 pr-4 font-semibold">How</th>
+                  <th className="py-2 font-semibold">Start</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cardioWeek.map((d) => (
+                  <tr key={d.day} className="border-b border-border/60 last:border-0">
+                    <td className="py-2.5 pr-4 font-semibold">{d.day}</td>
+                    <td className="py-2.5 pr-4 text-muted-foreground">{d.gym}</td>
+                    <td className={`py-2.5 pr-4 ${d.key ? "font-semibold text-foreground" : d.start ? "" : "text-muted-foreground"}`}>{d.cardio}</td>
+                    <td className="py-2.5 pr-4 text-muted-foreground">{d.how}</td>
+                    <td className="py-2.5">
+                      {d.start ? <span className={`${pill} bg-primary-muted text-primary`}>{d.start}</span> : <span className="text-muted-foreground">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <ul className="md:hidden divide-y divide-border/60">
+            {cardioWeek.map((d) => (
+              <li key={d.day} className="py-3 first:pt-0 last:pb-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">
+                    {d.day} <span className="text-muted-foreground font-normal">· {d.gym}</span>
+                  </span>
+                  {d.start && <span className={`${pill} bg-primary-muted text-primary`}>{d.start}</span>}
+                </div>
+                <div className={`text-sm mt-0.5 ${d.key ? "font-semibold" : d.start ? "" : "text-muted-foreground"}`}>{d.cardio}</div>
+                <div className="text-sm text-muted-foreground">{d.how}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4 mb-6">
+          <div className="card">
+            <h3 className="font-semibold mb-1 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-primary" /> Optional interval session
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">{intervalSession.when}</p>
+            <ol className="space-y-3">
+              {intervalSession.steps.map((step, i) => (
+                <li key={step} className="flex gap-3 text-sm">
+                  <span className="w-6 h-6 rounded-full bg-primary-muted text-primary text-xs font-bold flex items-center justify-center flex-shrink-0">
+                    {i + 1}
+                  </span>
+                  <span className="pt-0.5">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <div className="card">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <Bike className="w-4 h-4 text-primary" /> Which machine?
+            </h3>
+            <ul className="divide-y divide-border/60">
+              {cardioMachines.map((m) => (
+                <li key={m.name} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0 text-sm">
+                  <span className={`${pill} ${verdictStyle[m.verdict]} uppercase tracking-wide w-20 justify-center flex-shrink-0`}>
+                    {m.verdict}
+                  </span>
+                  <span className="text-muted-foreground">
+                    <span className="text-foreground font-medium">{m.name}</span>: {m.note}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="rounded-xl border-l-4 border-primary bg-primary-muted p-4 text-sm">
+          <span className="font-semibold text-foreground">Cardio rules: </span>
+          <span className="text-muted-foreground">{cardioRules}</span>
+        </div>
+      </div>
+    </section>
   );
 }
