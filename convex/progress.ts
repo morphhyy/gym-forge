@@ -34,6 +34,7 @@ export const getExerciseHistory = query({
         .withIndex("by_session_exercise", (q) =>
           q.eq("sessionId", session._id).eq("exerciseId", args.exerciseId)
         )
+        .filter((q) => q.neq(q.field("setType"), "warmup")) // exclude warm-ups
         .collect();
 
       if (sets.length > 0) {
@@ -122,6 +123,7 @@ export const getWeeklySummary = query({
       const sets = await ctx.db
         .query("sessionSets")
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .filter((q) => q.neq(q.field("setType"), "warmup")) // exclude warm-ups
         .collect();
 
       for (const set of sets) {
@@ -177,6 +179,7 @@ export const getAllExerciseStats = query({
       const sets = await ctx.db
         .query("sessionSets")
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .filter((q) => q.neq(q.field("setType"), "warmup")) // exclude warm-ups
         .collect();
 
       for (const set of sets) {

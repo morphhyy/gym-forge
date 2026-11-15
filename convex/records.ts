@@ -18,9 +18,12 @@ export const checkAndUpdatePR = mutation({
     weight: v.number(),
     reps: v.number(),
     date: v.string(),
+    setType: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
+    // Warm-up sets never count towards PRs
+    if (args.setType === "warmup") return { newPRs: [], newAchievement: null };
 
     // Calculate metrics for this set
     const e1rm = calculateE1RM(args.weight, args.reps);

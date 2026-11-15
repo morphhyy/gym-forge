@@ -84,6 +84,23 @@ export default defineSchema({
     weekday: v.optional(v.number()),
     completedAt: v.optional(v.number()),
     notes: v.optional(v.string()),
+    // When the workout started (session creation or first logged set)
+    startedAt: v.optional(v.number()),
+    // Session-level exercise list snapshot. Absent = derived from the plan
+    // template + logged sets. See convex/lib/sessionExercises.ts.
+    exercises: v.optional(
+      v.array(
+        v.object({
+          key: v.string(),
+          exerciseId: v.id("exercises"),
+          planExerciseId: v.optional(v.id("planExercises")),
+          sets: v.array(v.object({ repsTarget: v.optional(v.number()) })),
+          supersetGroup: v.optional(v.string()),
+          restSeconds: v.optional(v.number()),
+          swappedFromExerciseId: v.optional(v.id("exercises")),
+        })
+      )
+    ),
     createdAt: v.number(),
   })
     .index("by_user", ["userId"])
@@ -97,6 +114,15 @@ export default defineSchema({
     repsActual: v.number(),
     weight: v.number(),
     rpe: v.optional(v.number()), // Rate of Perceived Exertion (1-10)
+    // Absent = "normal". Warm-up sets are excluded from volume/e1RM/PRs.
+    setType: v.optional(
+      v.union(
+        v.literal("normal"),
+        v.literal("warmup"),
+        v.literal("drop"),
+        v.literal("failure")
+      )
+    ),
     createdAt: v.number(),
   })
     .index("by_session", ["sessionId"])
