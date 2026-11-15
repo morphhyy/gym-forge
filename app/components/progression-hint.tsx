@@ -3,7 +3,7 @@
 import { ArrowDown, ArrowUp, Plus, Sparkles } from "lucide-react";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { NextTarget, ProgressionAction } from "@/convex/lib/progression";
-import { cn } from "@/app/lib/utils";
+import { cn } from "@/lib/utils";
 
 export interface ProgressionHintProps {
   exerciseId: Id<"exercises"> | string;

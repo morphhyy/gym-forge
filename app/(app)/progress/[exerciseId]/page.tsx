@@ -27,6 +27,7 @@ import {
   TooltipProps,
 } from "recharts";
 import { format, parseISO } from "date-fns";
+import { ProgressionHint } from "@/app/components/progression-hint";
 
 
 interface ChartDataPoint {
@@ -75,8 +76,8 @@ export default function ExerciseProgressPage() {
     days: 90,
     today,
   });
-  const suggestions = useQuery(api.progress.getExerciseSuggestions, {
-    exerciseId,
+  const nextTargets = useQuery(api.progression.getNextTargets, {
+    exerciseIds: [exerciseId],
   });
   const exercises = useQuery(api.exercises.getAllExercises);
   const userData = useQuery(api.users.getCurrentUser);
@@ -85,7 +86,7 @@ export default function ExerciseProgressPage() {
   const exercise = exercises?.find((e) => e._id === exerciseId);
 
   const isLoading =
-    history === undefined || suggestions === undefined || exercise === undefined;
+    history === undefined || exercise === undefined;
 
   if (isLoading) {
     return (
@@ -151,53 +152,13 @@ export default function ExerciseProgressPage() {
         </p>
       </div>
 
-      {/* Suggestion Card */}
-      {suggestions.suggestion && (
-        <div
-          className={`card flex items-start gap-3 sm:gap-4 ${suggestions.suggestion === "increase"
-            ? "bg-primary-muted border-primary/30"
-            : suggestions.suggestion === "decrease"
-              ? "bg-danger-muted border-danger/30"
-              : "bg-indigo-500/10 border-indigo-500/30"
-            }`}
-        >
-          <div
-            className={`w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-xl flex items-center justify-center ${suggestions.suggestion === "increase"
-              ? "bg-primary/20"
-              : suggestions.suggestion === "decrease"
-                ? "bg-danger/20"
-                : "bg-indigo-500/20"
-              }`}
-          >
-            {suggestions.suggestion === "increase" ? (
-              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-            ) : suggestions.suggestion === "decrease" ? (
-              <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6 text-danger" />
-            ) : (
-              <Target className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
-            )}
-          </div>
-          <div className="min-w-0">
-            <h3
-              className={`font-semibold ${suggestions.suggestion === "increase"
-                ? "text-primary"
-                : suggestions.suggestion === "decrease"
-                  ? "text-danger"
-                  : "text-indigo-400"
-                }`}
-            >
-              {suggestions.suggestion === "increase"
-                ? "Ready to Progress!"
-                : suggestions.suggestion === "decrease"
-                  ? "Consider a Deload"
-                  : "Keep It Up!"}
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {suggestions.reason}
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Next target (same double-progression engine as the workout logger) */}
+      <ProgressionHint
+        exerciseId={exerciseId}
+        target={nextTargets?.[exerciseId]}
+        units={weightUnit}
+        className="card"
+      />
 
       {/* Stats Grid */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">

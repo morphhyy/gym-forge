@@ -6,8 +6,6 @@ import {
   formatLargeNumber,
   getDayName,
   getShortDayName,
-  jsWeekdayToMonday,
-  getProgressionSuggestion,
 } from "@/app/lib/utils";
 
 describe("calculateE1RM", () => {
@@ -100,43 +98,5 @@ describe("getShortDayName", () => {
     expect(getShortDayName(4)).toBe("Thu");
     expect(getShortDayName(5)).toBe("Fri");
     expect(getShortDayName(6)).toBe("Sat");
-  });
-});
-
-describe("jsWeekdayToMonday", () => {
-  it("returns same value (identity function - JS weekday matches our system)", () => {
-    expect(jsWeekdayToMonday(0)).toBe(0); // Sunday
-    expect(jsWeekdayToMonday(1)).toBe(1); // Monday
-    expect(jsWeekdayToMonday(5)).toBe(5); // Friday
-    expect(jsWeekdayToMonday(6)).toBe(6); // Saturday
-  });
-});
-
-describe("getProgressionSuggestion", () => {
-  it("returns maintain with not enough data", () => {
-    const result = getProgressionSuggestion([100], [8]);
-    expect(result.action).toBe("maintain");
-  });
-
-  it("suggests increase when weights are stable and reps are hit", () => {
-    const result = getProgressionSuggestion([100, 100], [10, 9], 8);
-    expect(result.action).toBe("increase");
-    expect(result.amount).toBe(2.5);
-  });
-
-  it("suggests decrease when struggling with reps", () => {
-    const result = getProgressionSuggestion([100, 100], [4, 3], 8);
-    expect(result.action).toBe("decrease");
-  });
-
-  it("suggests maintain when making progress", () => {
-    const result = getProgressionSuggestion([105, 100], [8, 10], 8);
-    expect(result.action).toBe("maintain");
-  });
-
-  it("uses larger increment for heavier weights", () => {
-    const result = getProgressionSuggestion([200, 200], [10, 10], 8);
-    expect(result.action).toBe("increase");
-    expect(result.amount).toBe(5);
   });
 });

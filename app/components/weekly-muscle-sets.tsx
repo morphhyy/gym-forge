@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { Layers } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { VolumeStatus } from "@/convex/lib/weeklyVolume";
-import { cn } from "@/app/lib/utils";
+import { cn } from "@/lib/utils";
 
 const STATUS: Record<VolumeStatus, { label: string; bar: string; text: string }> = {
   under: { label: "Under", bar: "bg-amber-400", text: "text-amber-400" },
