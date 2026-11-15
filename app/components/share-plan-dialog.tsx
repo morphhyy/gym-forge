@@ -51,7 +51,7 @@ export function SharePlanDialog({
       const result = await generateToken({ planId });
       setShareToken(result.shareToken);
       toast.success("Share link created!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to generate share link");
     } finally {
       setIsGenerating(false);
@@ -64,7 +64,7 @@ export function SharePlanDialog({
       await revokeToken({ planId });
       setShareToken(null);
       toast.success("Share link revoked");
-    } catch (error) {
+    } catch {
       toast.error("Failed to revoke share link");
     } finally {
       setIsRevoking(false);
@@ -79,7 +79,7 @@ export function SharePlanDialog({
       setCopied(true);
       toast.success("Link copied to clipboard!");
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
+    } catch {
       toast.error("Failed to copy link");
     }
   };

@@ -8,7 +8,6 @@ import {
   Dumbbell,
   LineChart,
   Calendar,
-  Target,
   ArrowRight,
   Zap,
   Flame,

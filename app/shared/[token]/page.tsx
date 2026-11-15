@@ -36,7 +36,7 @@ export default function SharedPlanPage() {
       await copyPlan({ shareToken: token });
       toast.success("Plan copied to your account!");
       router.push("/plan");
-    } catch (error) {
+    } catch {
       toast.error("Failed to copy plan");
     } finally {
       setIsCopying(false);

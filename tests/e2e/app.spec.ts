@@ -93,7 +93,7 @@ test.describe("Responsive Design", () => {
 // Tests for authenticated users would require test user setup
 // These tests are marked as skip until auth is configured for testing
 test.describe.skip("Authenticated User Flow", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async () => {
     // TODO: Set up test user authentication
     // This would require either:
     // 1. Clerk test tokens

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Trophy, X, TrendingUp, Zap, Target } from "lucide-react";
+import { Trophy, X, TrendingUp, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PRInfo {
