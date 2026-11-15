@@ -26,6 +26,8 @@ type CalendarDayDetailProps = {
     totalVolume: number;
     exerciseCount: number;
     exercises: { name: string; setCount: number }[];
+    warmupDone?: boolean;
+    cooldownDone?: boolean;
   } | null;
   weightUnit: string;
 };
@@ -83,7 +85,7 @@ export function CalendarDayDetail({
           </div>
 
           {/* Summary Stats */}
-          <div className="flex items-center gap-6 pt-2 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 pt-2 text-sm text-muted-foreground">
             <span>
               {session.totalSets} total {session.totalSets === 1 ? "set" : "sets"}
             </span>
@@ -93,6 +95,13 @@ export function CalendarDayDetail({
                 : session.totalVolume}{" "}
               {weightUnit} volume
             </span>
+            {(session.warmupDone || session.cooldownDone) && (
+              <span>
+                {[session.warmupDone && "Warm-up ✓", session.cooldownDone && "Cool-down ✓"]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 mt-2">

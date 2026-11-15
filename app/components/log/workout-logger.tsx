@@ -26,6 +26,7 @@ import { useNow } from "./use-now";
 import { primeAudio, useRestTimer } from "./use-rest-timer";
 import { useWakeLock } from "./use-wake-lock";
 import { WorkoutSummary } from "./workout-summary";
+import { RoutineCheck, type Routine } from "./routine-check";
 import {
   resolveSetValues,
   setKey,
@@ -63,6 +64,18 @@ export function WorkoutLogger({ date }: { date: string }) {
   const removeSessionExercise = useMutation(api.sessions.removeSessionExercise);
   const completeSession = useMutation(api.sessions.completeSession);
   const checkAndUpdatePR = useMutation(api.records.checkAndUpdatePR);
+  const setSessionRoutine = useMutation(api.sessions.setSessionRoutine).withOptimisticUpdate(
+    (store, args) => {
+      const current = store.getQuery(api.sessions.getSessionByDate, { date });
+      if (!current || current._id !== args.sessionId) return;
+      const field = args.routine === "warmup" ? "warmupCompletedAt" : "cooldownCompletedAt";
+      store.setQuery(
+        api.sessions.getSessionByDate,
+        { date },
+        { ...current, [field]: args.done ? Date.now() : undefined }
+      );
+    }
+  );
 
   const [drafts, setDrafts] = useState<Record<string, SetDraft>>({});
   const [savingKeys, setSavingKeys] = useState<ReadonlySet<string>>(new Set());
@@ -414,6 +427,17 @@ export function WorkoutLogger({ date }: { date: string }) {
     }
   };
 
+  // Ticking the warm-up on a fresh day creates the session (and starts the
+  // workout clock), same as logging the first set.
+  const onToggleRoutine = async (routine: Routine, done: boolean) => {
+    try {
+      const sessionId = await ensureSession();
+      await setSessionRoutine({ sessionId, routine, done });
+    } catch {
+      toast.error(`Couldn't update ${routine === "warmup" ? "warm-up" : "cool-down"}`);
+    }
+  };
+
   const handleFinish = async () => {
     if (!sessionData?._id) return;
     setCompleting(true);
@@ -500,6 +524,12 @@ export function WorkoutLogger({ date }: { date: string }) {
         )
       ) : (
         <div className="space-y-4">
+          <RoutineCheck
+            routine="warmup"
+            done={sessionData?.warmupCompletedAt != null}
+            onToggle={(done) => void onToggleRoutine("warmup", done)}
+          />
+
           {groups.map((group) => {
             const isSuperset = !!group.supersetGroup && group.items.length > 1;
             const cards = group.items.map((entry) => (
@@ -556,6 +586,12 @@ export function WorkoutLogger({ date }: { date: string }) {
               Add exercise
             </button>
           )}
+
+          <RoutineCheck
+            routine="cooldown"
+            done={sessionData?.cooldownCompletedAt != null}
+            onToggle={(done) => void onToggleRoutine("cooldown", done)}
+          />
 
           {!isCompleted && totalLogged > 0 && (
             <button

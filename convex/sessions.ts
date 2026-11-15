@@ -358,6 +358,21 @@ export const getSessionPRs = query({
 });
 
 
+// Tick (or untick) the warm-up / cool-down for a session
+export const setSessionRoutine = mutation({
+  args: {
+    sessionId: v.id("sessions"),
+    routine: v.union(v.literal("warmup"), v.literal("cooldown")),
+    done: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const session = await getOwnedSession(ctx, args.sessionId);
+    const field = args.routine === "warmup" ? "warmupCompletedAt" : "cooldownCompletedAt";
+    // Patching with undefined removes the field
+    await ctx.db.patch(session._id, { [field]: args.done ? Date.now() : undefined });
+  },
+});
+
 // Log a set
 export const logSet = mutation({
   args: {
@@ -672,6 +687,8 @@ export const getSessionsForMonth = query({
           _id: session._id,
           date: session.date,
           completedAt: session.completedAt,
+          warmupDone: session.warmupCompletedAt !== undefined,
+          cooldownDone: session.cooldownCompletedAt !== undefined,
           totalSets: sets.length,
           totalVolume,
           exerciseCount: exerciseMap.size,

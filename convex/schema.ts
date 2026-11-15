@@ -92,6 +92,9 @@ export default defineSchema({
     notes: v.optional(v.string()),
     // When the workout started (session creation or first logged set)
     startedAt: v.optional(v.number()),
+    // Warm-up / cool-down ticked off in the logger (absent = not done)
+    warmupCompletedAt: v.optional(v.number()),
+    cooldownCompletedAt: v.optional(v.number()),
     // Session-level exercise list snapshot. Absent = derived from the plan
     // template + logged sets. See convex/lib/sessionExercises.ts.
     exercises: v.optional(
