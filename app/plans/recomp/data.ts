@@ -4,6 +4,9 @@
  */
 
 export const PLAN_PDF_URL = "/plans/recomp/gymforge-5-day-recomp-plan.pdf";
+/** `?template=` id that opens this plan prefilled in the plan editor. */
+export const RECOMP_TEMPLATE_ID = "recomp-5-day";
+export const USE_PLAN_URL = `/plan?template=${RECOMP_TEMPLATE_ID}`;
 export const PLAN_PDF_FILENAME = "gymforge-5-day-recomp-plan.pdf";
 
 export type ExerciseGif =
@@ -50,6 +53,18 @@ export interface Exercise {
   rest: string;
   cue: string;
   gif: ExerciseGif;
+  /** How this exercise is logged when the plan is added to GymForge. */
+  log: LoggedExercise[];
+}
+
+/** One catalog exercise as it is added to a GymForge plan. `reps` is the top of the range (double progression). */
+export interface LoggedExercise {
+  exercise: string;
+  sets: number;
+  reps: number;
+  muscleGroup: string;
+  equipment: string;
+  supersetGroup?: string;
 }
 
 export type DayKind = "pump" | "heavy" | "rest";
@@ -58,6 +73,8 @@ export interface Workout {
   id: string;
   title: string;
   weekday: string;
+  /** 0 = Sunday, matching plan weekdays in the app. */
+  weekdayIndex: number;
   kind: Exclude<DayKind, "rest">;
   summary: string;
   exercises: Exercise[];
@@ -92,75 +109,110 @@ export const workouts: Workout[] = [
     id: "push",
     title: "Push",
     weekday: "Sunday",
+    weekdayIndex: 0,
     kind: "pump",
     summary: "Hypertrophy. Controlled reps; take isolation sets close to failure.",
     exercises: [
-      { name: "Incline dumbbell press (30°)", sets: "4 × 8–12", rest: "2 min", cue: "Upper-chest focus, deep stretch at the bottom", gif: "incline_db_press" },
-      { name: "Machine chest press", alt: "or weighted dips", sets: "3 × 10–12", rest: "90 s", cue: "Handles at mid-chest, don't slam the lockout", gif: "machine_chest_press" },
-      { name: "Low-to-high cable fly", sets: "3 × 12–15", rest: "60 s", cue: "Sweep hands up to chin height and squeeze", gif: "cable_fly_low_high" },
-      { name: "Dumbbell or cable lateral raise", sets: "4 × 12–20", rest: "60 s", cue: "Lead with the elbows, no swinging", gif: "lateral_raise" },
-      { name: "Triceps rope pushdown", sets: "3 × 10–15", rest: "60 s", cue: "Elbows pinned, spread the rope at the bottom", gif: "rope_pushdown" },
-      { name: "Overhead dumbbell triceps extension", sets: "2 × 10–15", rest: "60 s", cue: "Lower behind the head for a full stretch", gif: "overhead_db_ext" },
+      { name: "Incline dumbbell press (30°)", sets: "4 × 8–12", rest: "2 min", cue: "Upper-chest focus, deep stretch at the bottom", gif: "incline_db_press",
+        log: [{ exercise: "Incline Dumbbell Press", sets: 4, reps: 12, muscleGroup: "Chest", equipment: "Dumbbell" }] },
+      { name: "Machine chest press", alt: "or weighted dips", sets: "3 × 10–12", rest: "90 s", cue: "Handles at mid-chest, don't slam the lockout", gif: "machine_chest_press",
+        log: [{ exercise: "Machine Chest Press", sets: 3, reps: 12, muscleGroup: "Chest", equipment: "Machine" }] },
+      { name: "Low-to-high cable fly", sets: "3 × 12–15", rest: "60 s", cue: "Sweep hands up to chin height and squeeze", gif: "cable_fly_low_high",
+        log: [{ exercise: "Low-to-High Cable Fly", sets: 3, reps: 15, muscleGroup: "Chest", equipment: "Cable" }] },
+      { name: "Dumbbell or cable lateral raise", sets: "4 × 12–20", rest: "60 s", cue: "Lead with the elbows, no swinging", gif: "lateral_raise",
+        log: [{ exercise: "Lateral Raise", sets: 4, reps: 20, muscleGroup: "Shoulders", equipment: "Dumbbell" }] },
+      { name: "Triceps rope pushdown", sets: "3 × 10–15", rest: "60 s", cue: "Elbows pinned, spread the rope at the bottom", gif: "rope_pushdown",
+        log: [{ exercise: "Tricep Pushdown", sets: 3, reps: 15, muscleGroup: "Arms", equipment: "Cable" }] },
+      { name: "Overhead dumbbell triceps extension", sets: "2 × 10–15", rest: "60 s", cue: "Lower behind the head for a full stretch", gif: "overhead_db_ext",
+        log: [{ exercise: "Overhead Dumbbell Tricep Extension", sets: 2, reps: 15, muscleGroup: "Arms", equipment: "Dumbbell" }] },
     ],
   },
   {
     id: "pull",
     title: "Pull",
     weekday: "Monday",
+    weekdayIndex: 1,
     kind: "pump",
     summary: "Back width and thickness, rear delts and arms.",
     exercises: [
-      { name: "Neutral-grip lat pulldown", sets: "4 × 8–12", rest: "2 min", cue: "Drive elbows down to your back pockets", gif: "lat_pulldown" },
-      { name: "Chest-supported row", sets: "3 × 8–12", rest: "2 min", cue: "Chest stays on the pad, no jerking", gif: "chest_supported_row" },
-      { name: "Single-arm cable row", sets: "3 × 10–15", rest: "90 s", cue: "Elbow past the torso, stretch forward each rep", gif: "single_arm_cable_row" },
-      { name: "Reverse pec deck", sets: "3 × 15–20", rest: "60 s", cue: "Arms wide, squeeze the rear shoulders", gif: "reverse_pec_deck" },
-      { name: "Incline dumbbell curl", sets: "3 × 10–12", rest: "60 s", cue: "Arms hang behind the body for a full stretch", gif: "incline_db_curl" },
-      { name: "Hammer curl + face pull", sets: "2 × 10–15", rest: "60 s", cue: "Neutral grip. Add 2 × 15 face pulls for posture", gif: "hammer_curl" },
+      { name: "Neutral-grip lat pulldown", sets: "4 × 8–12", rest: "2 min", cue: "Drive elbows down to your back pockets", gif: "lat_pulldown",
+        log: [{ exercise: "Lat Pulldown", sets: 4, reps: 12, muscleGroup: "Back", equipment: "Cable" }] },
+      { name: "Chest-supported row", sets: "3 × 8–12", rest: "2 min", cue: "Chest stays on the pad, no jerking", gif: "chest_supported_row",
+        log: [{ exercise: "Chest-Supported Row", sets: 3, reps: 12, muscleGroup: "Back", equipment: "Dumbbell" }] },
+      { name: "Single-arm cable row", sets: "3 × 10–15", rest: "90 s", cue: "Elbow past the torso, stretch forward each rep", gif: "single_arm_cable_row",
+        log: [{ exercise: "Single-Arm Cable Row", sets: 3, reps: 15, muscleGroup: "Back", equipment: "Cable" }] },
+      { name: "Reverse pec deck", sets: "3 × 15–20", rest: "60 s", cue: "Arms wide, squeeze the rear shoulders", gif: "reverse_pec_deck",
+        log: [{ exercise: "Reverse Pec Deck", sets: 3, reps: 20, muscleGroup: "Shoulders", equipment: "Machine" }] },
+      { name: "Incline dumbbell curl", sets: "3 × 10–12", rest: "60 s", cue: "Arms hang behind the body for a full stretch", gif: "incline_db_curl",
+        log: [{ exercise: "Incline Dumbbell Curl", sets: 3, reps: 12, muscleGroup: "Arms", equipment: "Dumbbell" }] },
+      { name: "Hammer curl + face pull", sets: "2 × 10–15", rest: "60 s", cue: "Neutral grip. Add 2 × 15 face pulls for posture", gif: "hammer_curl",
+        log: [{ exercise: "Hammer Curl", sets: 2, reps: 15, muscleGroup: "Arms", equipment: "Dumbbell" }, { exercise: "Face Pull", sets: 2, reps: 15, muscleGroup: "Shoulders", equipment: "Cable" }] },
     ],
   },
   {
     id: "legs",
     title: "Legs",
     weekday: "Tuesday",
+    weekdayIndex: 2,
     kind: "pump",
     summary: "Volume day. Quads, glutes and hamstrings with machines and single-leg work.",
     exercises: [
-      { name: "Hack squat", alt: "or leg press", sets: "4 × 8–12", rest: "2–3 min", cue: "Full depth, knees track over the toes", gif: "hack_squat" },
-      { name: "Barbell hip thrust", sets: "3 × 8–12", rest: "2 min", cue: "Chin tucked, squeeze glutes 1 s at the top", gif: "hip_thrust" },
-      { name: "Bulgarian split squat", sets: "3 × 10–12 / leg", rest: "90 s", cue: "Front heel stays down, torso tall", gif: "bulgarian_split_squat" },
-      { name: "Lying leg curl", sets: "3 × 10–15", rest: "90 s", cue: "Hips pressed into the pad, lower slowly", gif: "lying_leg_curl" },
-      { name: "Leg extension", sets: "3 × 12–15", rest: "60 s", cue: "Pause 1 s at the top", gif: "leg_extension" },
-      { name: "Seated calf raise", sets: "3 × 12–20", rest: "60 s", cue: "Full stretch at the bottom, 2 s pause", gif: "seated_calf_raise" },
+      { name: "Hack squat", alt: "or leg press", sets: "4 × 8–12", rest: "2–3 min", cue: "Full depth, knees track over the toes", gif: "hack_squat",
+        log: [{ exercise: "Hack Squat", sets: 4, reps: 12, muscleGroup: "Legs", equipment: "Machine" }] },
+      { name: "Barbell hip thrust", sets: "3 × 8–12", rest: "2 min", cue: "Chin tucked, squeeze glutes 1 s at the top", gif: "hip_thrust",
+        log: [{ exercise: "Hip Thrust", sets: 3, reps: 12, muscleGroup: "Legs", equipment: "Barbell" }] },
+      { name: "Bulgarian split squat", sets: "3 × 10–12 / leg", rest: "90 s", cue: "Front heel stays down, torso tall", gif: "bulgarian_split_squat",
+        log: [{ exercise: "Bulgarian Split Squat", sets: 3, reps: 12, muscleGroup: "Legs", equipment: "Dumbbell" }] },
+      { name: "Lying leg curl", sets: "3 × 10–15", rest: "90 s", cue: "Hips pressed into the pad, lower slowly", gif: "lying_leg_curl",
+        log: [{ exercise: "Lying Leg Curl", sets: 3, reps: 15, muscleGroup: "Legs", equipment: "Machine" }] },
+      { name: "Leg extension", sets: "3 × 12–15", rest: "60 s", cue: "Pause 1 s at the top", gif: "leg_extension",
+        log: [{ exercise: "Leg Extension", sets: 3, reps: 15, muscleGroup: "Legs", equipment: "Machine" }] },
+      { name: "Seated calf raise", sets: "3 × 12–20", rest: "60 s", cue: "Full stretch at the bottom, 2 s pause", gif: "seated_calf_raise",
+        log: [{ exercise: "Seated Calf Raise", sets: 3, reps: 20, muscleGroup: "Legs", equipment: "Machine" }] },
     ],
   },
   {
     id: "upper",
     title: "Upper",
     weekday: "Thursday",
+    weekdayIndex: 4,
     kind: "heavy",
     summary: "Heavy compounds. Rest fully between sets and chase weight on the bar.",
     exercises: [
-      { name: "Barbell bench press", sets: "4 × 5–7", rest: "2–3 min", cue: "Shoulder blades pinched, bar to lower chest", gif: "bench_press" },
-      { name: "Weighted pull-up", alt: "or lat pulldown", sets: "4 × 6–8", rest: "2–3 min", cue: "Full hang at the bottom, chest to the bar", gif: "pull_up" },
-      { name: "Seated cable row", sets: "3 × 8–10", rest: "2 min", cue: "Pull elbows to hips and pause 1 s", gif: "seated_cable_row" },
-      { name: "Seated dumbbell shoulder press", sets: "3 × 8–10", rest: "2 min", cue: "Lower to ear level, press straight up", gif: "seated_db_press" },
-      { name: "EZ-bar curl ⇄ overhead cable triceps ext.", sets: "2 × 10–12", rest: "60 s", cue: "Superset: alternate the two with no rest between", gif: "ez_bar_curl" },
-      { name: "Cable lateral raise", sets: "2 × 12–15", rest: "60 s", cue: "Cable behind the body, raise to shoulder height", gif: "cable_lateral_raise" },
+      { name: "Barbell bench press", sets: "4 × 5–7", rest: "2–3 min", cue: "Shoulder blades pinched, bar to lower chest", gif: "bench_press",
+        log: [{ exercise: "Bench Press", sets: 4, reps: 7, muscleGroup: "Chest", equipment: "Barbell" }] },
+      { name: "Weighted pull-up", alt: "or lat pulldown", sets: "4 × 6–8", rest: "2–3 min", cue: "Full hang at the bottom, chest to the bar", gif: "pull_up",
+        log: [{ exercise: "Pull-Up", sets: 4, reps: 8, muscleGroup: "Back", equipment: "Bodyweight" }] },
+      { name: "Seated cable row", sets: "3 × 8–10", rest: "2 min", cue: "Pull elbows to hips and pause 1 s", gif: "seated_cable_row",
+        log: [{ exercise: "Seated Cable Row", sets: 3, reps: 10, muscleGroup: "Back", equipment: "Cable" }] },
+      { name: "Seated dumbbell shoulder press", sets: "3 × 8–10", rest: "2 min", cue: "Lower to ear level, press straight up", gif: "seated_db_press",
+        log: [{ exercise: "Dumbbell Shoulder Press", sets: 3, reps: 10, muscleGroup: "Shoulders", equipment: "Dumbbell" }] },
+      { name: "EZ-bar curl ⇄ overhead cable triceps ext.", sets: "2 × 10–12", rest: "60 s", cue: "Superset: alternate the two with no rest between", gif: "ez_bar_curl",
+        log: [{ exercise: "EZ-Bar Curl", sets: 2, reps: 12, muscleGroup: "Arms", equipment: "Barbell", supersetGroup: "arms" }, { exercise: "Overhead Cable Tricep Extension", sets: 2, reps: 12, muscleGroup: "Arms", equipment: "Cable", supersetGroup: "arms" }] },
+      { name: "Cable lateral raise", sets: "2 × 12–15", rest: "60 s", cue: "Cable behind the body, raise to shoulder height", gif: "cable_lateral_raise",
+        log: [{ exercise: "Cable Lateral Raise", sets: 2, reps: 15, muscleGroup: "Shoulders", equipment: "Cable" }] },
     ],
   },
   {
     id: "lower",
     title: "Lower",
     weekday: "Friday",
+    weekdayIndex: 5,
     kind: "heavy",
     summary: "Strength focus. Leave 2–3 reps in the tank on squats and RDLs.",
     exercises: [
-      { name: "Back squat", sets: "4 × 5–7", rest: "3 min", cue: "Brace hard, hips below parallel if mobility allows", gif: "back_squat" },
-      { name: "Romanian deadlift", sets: "3 × 6–8", rest: "2–3 min", cue: "Hips back, bar close to the legs", gif: "romanian_deadlift" },
-      { name: "Leg press", sets: "3 × 10–12", rest: "2 min", cue: "Deep as you can without the hips lifting", gif: "leg_press" },
-      { name: "Seated leg curl", sets: "3 × 10–15", rest: "90 s", cue: "Lean slightly forward for more stretch", gif: "seated_leg_curl" },
-      { name: "Standing calf raise", sets: "3 × 8–12", rest: "60 s", cue: "2 s pause at the bottom stretch", gif: "standing_calf_raise" },
-      { name: "Hanging leg raise", sets: "3 × 10–15", rest: "60 s", cue: "Curl the pelvis up, no swinging", gif: "hanging_leg_raise" },
+      { name: "Back squat", sets: "4 × 5–7", rest: "3 min", cue: "Brace hard, hips below parallel if mobility allows", gif: "back_squat",
+        log: [{ exercise: "Squat", sets: 4, reps: 7, muscleGroup: "Legs", equipment: "Barbell" }] },
+      { name: "Romanian deadlift", sets: "3 × 6–8", rest: "2–3 min", cue: "Hips back, bar close to the legs", gif: "romanian_deadlift",
+        log: [{ exercise: "Romanian Deadlift", sets: 3, reps: 8, muscleGroup: "Legs", equipment: "Barbell" }] },
+      { name: "Leg press", sets: "3 × 10–12", rest: "2 min", cue: "Deep as you can without the hips lifting", gif: "leg_press",
+        log: [{ exercise: "Leg Press", sets: 3, reps: 12, muscleGroup: "Legs", equipment: "Machine" }] },
+      { name: "Seated leg curl", sets: "3 × 10–15", rest: "90 s", cue: "Lean slightly forward for more stretch", gif: "seated_leg_curl",
+        log: [{ exercise: "Seated Leg Curl", sets: 3, reps: 15, muscleGroup: "Legs", equipment: "Machine" }] },
+      { name: "Standing calf raise", sets: "3 × 8–12", rest: "60 s", cue: "2 s pause at the bottom stretch", gif: "standing_calf_raise",
+        log: [{ exercise: "Calf Raise", sets: 3, reps: 12, muscleGroup: "Legs", equipment: "Machine" }] },
+      { name: "Hanging leg raise", sets: "3 × 10–15", rest: "60 s", cue: "Curl the pelvis up, no swinging", gif: "hanging_leg_raise",
+        log: [{ exercise: "Hanging Leg Raise", sets: 3, reps: 15, muscleGroup: "Core", equipment: "Bodyweight" }] },
     ],
   },
 ];

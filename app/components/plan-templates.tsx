@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useCallback, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
+import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
@@ -16,12 +17,18 @@ import {
   ChevronDown,
   ChevronUp,
   Check,
+  Loader2,
 } from "lucide-react";
+import { RECOMP_TEMPLATE_ID, workouts as recompWorkouts } from "@/app/plans/recomp/data";
 
 type TemplateExercise = {
   name: string;
   sets: number;
   reps: number;
+  /** Used when the exercise is missing from the catalog and gets created. */
+  muscleGroup?: string;
+  equipment?: string;
+  supersetGroup?: string;
 };
 
 type TemplateDay = {
@@ -39,7 +46,31 @@ type Template = {
   days: TemplateDay[];
 };
 
+const RECOMP_TEMPLATE: Template = {
+  id: RECOMP_TEMPLATE_ID,
+  name: "GymForge 5-Day Recomp",
+  description:
+    "Our free recomp plan: pump days Sun–Tue, heavy upper/lower Thu–Fri. Lose fat and build muscle at the same time.",
+  frequency: "5 days/week",
+  level: "Intermediate",
+  days: recompWorkouts.map((w) => ({
+    weekday: w.weekdayIndex,
+    name: w.title,
+    exercises: w.exercises.flatMap((e) =>
+      e.log.map((l) => ({
+        name: l.exercise,
+        sets: l.sets,
+        reps: l.reps,
+        muscleGroup: l.muscleGroup,
+        equipment: l.equipment,
+        supersetGroup: l.supersetGroup,
+      }))
+    ),
+  })),
+};
+
 const TEMPLATES: Template[] = [
+  RECOMP_TEMPLATE,
   {
     id: "arnold-split",
     name: "Arnold Split",
@@ -412,22 +443,83 @@ const TEMPLATES: Template[] = [
   },
 ];
 
+export type TemplatePlan = {
+  planName: string;
+  days: {
+    weekday: number;
+    name?: string;
+    exercises: {
+      exerciseId: Id<"exercises">;
+      exerciseName: string;
+      order: number;
+      sets: { repsTarget: number }[];
+      supersetGroup?: string;
+    }[];
+  }[];
+};
+
+export function getTemplate(id: string): Template | undefined {
+  return TEMPLATES.find((t) => t.id === id);
+}
+
+/**
+ * Turns a template into an editable plan. Exercises missing from the catalog
+ * are created as the user's own custom exercises, so nothing is dropped.
+ */
+export function useTemplateToPlan() {
+  const exercises = useQuery(api.exercises.getAllExercises);
+  const createExercise = useMutation(api.exercises.createExercise);
+  const ready = exercises !== undefined && exercises.length > 0;
+
+  const buildPlan = useCallback(
+    async (template: Template): Promise<TemplatePlan | null> => {
+      if (!exercises || exercises.length === 0) return null;
+
+      const ids = new Map<string, Id<"exercises">>();
+      for (const e of exercises) {
+        if (!ids.has(e.name.toLowerCase())) ids.set(e.name.toLowerCase(), e._id);
+      }
+
+      const missing = new Map<string, TemplateExercise>();
+      for (const day of template.days) {
+        for (const ex of day.exercises) {
+          if (!ids.has(ex.name.toLowerCase())) missing.set(ex.name.toLowerCase(), ex);
+        }
+      }
+      for (const [key, ex] of missing) {
+        const id = await createExercise({
+          name: ex.name,
+          muscleGroup: ex.muscleGroup,
+          equipment: ex.equipment,
+        });
+        ids.set(key, id);
+      }
+
+      return {
+        planName: template.name,
+        days: template.days.map((day) => ({
+          weekday: day.weekday,
+          name: day.name,
+          exercises: day.exercises.map((ex, idx) => ({
+            exerciseId: ids.get(ex.name.toLowerCase()) as Id<"exercises">,
+            exerciseName: ex.name,
+            order: idx,
+            sets: Array.from({ length: ex.sets }, () => ({ repsTarget: ex.reps })),
+            supersetGroup: ex.supersetGroup,
+          })),
+        })),
+      };
+    },
+    [exercises, createExercise]
+  );
+
+  return { ready, buildPlan };
+}
+
 type PlanTemplatesProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelectTemplate: (plan: {
-    planName: string;
-    days: {
-      weekday: number;
-      name?: string;
-      exercises: {
-        exerciseId: Id<"exercises">;
-        exerciseName: string;
-        order: number;
-        sets: { repsTarget: number }[];
-      }[];
-    }[];
-  }) => void;
+  onSelectTemplate: (plan: TemplatePlan) => void;
 };
 
 export function PlanTemplates({
@@ -435,47 +527,23 @@ export function PlanTemplates({
   onOpenChange,
   onSelectTemplate,
 }: PlanTemplatesProps) {
-  const exercises = useQuery(api.exercises.getAllExercises);
+  const { ready, buildPlan } = useTemplateToPlan();
   const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null);
+  const [applying, setApplying] = useState<string | null>(null);
 
-  const findExerciseId = (name: string): Id<"exercises"> | null => {
-    if (!exercises) return null;
-    const found = exercises.find((e) => e.name === name);
-    return found?._id ?? null;
-  };
-
-  const handleSelect = (template: Template) => {
-    if (!exercises) return;
-
-    const mappedDays = template.days.map((day) => ({
-      weekday: day.weekday,
-      name: day.name,
-      exercises: day.exercises
-        .map((ex, idx) => {
-          const exerciseId = findExerciseId(ex.name);
-          if (!exerciseId) return null;
-          return {
-            exerciseId,
-            exerciseName: ex.name,
-            order: idx,
-            sets: Array.from({ length: ex.sets }, () => ({
-              repsTarget: ex.reps,
-            })),
-          };
-        })
-        .filter(Boolean) as {
-          exerciseId: Id<"exercises">;
-          exerciseName: string;
-          order: number;
-          sets: { repsTarget: number }[];
-        }[],
-    }));
-
-    onSelectTemplate({
-      planName: template.name,
-      days: mappedDays,
-    });
-    onOpenChange(false);
+  const handleSelect = async (template: Template) => {
+    setApplying(template.id);
+    try {
+      const plan = await buildPlan(template);
+      if (!plan) return;
+      onSelectTemplate(plan);
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Failed to apply template:", error);
+      toast.error("Couldn't load this template. Please try again.");
+    } finally {
+      setApplying(null);
+    }
   };
 
   return (
@@ -568,10 +636,14 @@ export function PlanTemplates({
 
                     <button
                       onClick={() => handleSelect(template)}
-                      disabled={!exercises}
+                      disabled={!ready || applying !== null}
                       className="btn btn-primary w-full mt-4"
                     >
-                      <Check className="w-4 h-4" />
+                      {applying === template.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4" />
+                      )}
                       Use This Template
                     </button>
                   </div>

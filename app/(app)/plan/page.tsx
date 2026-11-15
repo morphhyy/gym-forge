@@ -1,13 +1,19 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { ExerciseSelector } from "@/app/components/exercise-selector";
 import { AIPlanGenerator } from "@/app/components/ai-plan-generator";
 import { SharePlanDialog } from "@/app/components/share-plan-dialog";
-import { PlanTemplates } from "@/app/components/plan-templates";
+import {
+  PlanTemplates,
+  getTemplate,
+  useTemplateToPlan,
+  type TemplatePlan,
+} from "@/app/components/plan-templates";
 import {
   Plus,
   Trash2,
@@ -176,19 +182,7 @@ export default function PlanPage() {
     setEditingPlanId(null);
   };
 
-  const handleTemplateSelected = (plan: {
-    planName: string;
-    days: {
-      weekday: number;
-      name?: string;
-      exercises: {
-        exerciseId: Id<"exercises">;
-        exerciseName: string;
-        order: number;
-        sets: { repsTarget: number }[];
-      }[];
-    }[];
-  }) => {
+  const handleTemplateSelected = useCallback((plan: TemplatePlan) => {
     setPlanName(plan.planName);
     setDays(
       plan.days.map((day) => ({
@@ -202,7 +196,36 @@ export default function PlanPage() {
     setExpandedDay(0);
     setIsAIGenerated(false);
     setEditingPlanId(null);
-  };
+  }, []);
+
+  // Open a template straight in the editor when linked with ?template=<id>
+  // (e.g. "Use this plan" on /plans/recomp).
+  const router = useRouter();
+  const { ready: templatesReady, buildPlan } = useTemplateToPlan();
+  const templateParamHandled = useRef(false);
+  useEffect(() => {
+    if (templateParamHandled.current || !templatesReady) return;
+    const id = new URLSearchParams(window.location.search).get("template");
+    if (!id) return;
+    templateParamHandled.current = true;
+    router.replace("/plan");
+    const template = getTemplate(id);
+    if (!template) {
+      toast.error("That plan template doesn't exist.");
+      return;
+    }
+    const toastId = toast.loading(`Loading ${template.name}...`);
+    buildPlan(template)
+      .then((plan) => {
+        if (!plan) throw new Error("Exercise catalog not loaded");
+        handleTemplateSelected(plan);
+        toast.success("Plan loaded. Review it, then save to add it to your plans.", { id: toastId });
+      })
+      .catch((error: unknown) => {
+        console.error("Failed to load template:", error);
+        toast.error("Couldn't load this plan. Please try again.", { id: toastId });
+      });
+  }, [templatesReady, buildPlan, handleTemplateSelected, router]);
 
   const startEditing = () => {
     initializeFromPlan();

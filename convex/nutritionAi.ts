@@ -80,13 +80,15 @@ export const analyzeFoodImage = action({
     }
 
     // Get the image URL from Convex storage
-    const imageUrl = await ctx.storage.getUrl(args.storageId);
+    const storageUrl = await ctx.storage.getUrl(args.storageId);
 
-    if (!imageUrl) {
+    if (!storageUrl) {
       throw new Error(
         "Could not retrieve image URL. The storage ID may be invalid or the file may have been deleted."
       );
     }
+
+    const imageUrl: string = storageUrl;
 
     const systemPrompt = `You are an expert nutritionist analyzing food photos. Your task is to identify the food in the image and estimate its nutritional content per serving as accurately as possible.
 

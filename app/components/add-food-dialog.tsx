@@ -3,8 +3,8 @@
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAction, useMutation } from "convex/react";
-import { Camera, Check, Loader2, Lock, RotateCcw, Utensils } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { Camera, Check, ImagePlus, Loader2, Lock, RotateCcw, Utensils, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -37,6 +37,15 @@ interface AnalysisResult {
   confidence: "high" | "medium" | "low";
 }
 
+const MACRO_FIELDS = [
+  { key: "calories", label: "Calories", unit: "kcal" },
+  { key: "protein", label: "Protein", unit: "g" },
+  { key: "carbs", label: "Carbs", unit: "g" },
+  { key: "fat", label: "Fat", unit: "g" },
+  { key: "fiber", label: "Fiber", unit: "g" },
+  { key: "sugar", label: "Sugar", unit: "g" },
+] as const;
+
 function getDefaultMealType(): MealType {
   const hour = new Date().getHours();
   if (hour < 11) return "breakfast";
@@ -45,7 +54,38 @@ function getDefaultMealType(): MealType {
   return "snack";
 }
 
-async function compressImage(file: File): Promise<Blob> {
+const MEAL_TYPES: { value: MealType; label: string }[] = [
+  { value: "breakfast", label: "Breakfast" },
+  { value: "lunch", label: "Lunch" },
+  { value: "dinner", label: "Dinner" },
+  { value: "snack", label: "Snack" },
+];
+
+const CONFIDENCE_COLORS: Record<string, string> = {
+  high: "bg-green-500/15 text-green-500 border-green-500/30",
+  medium: "bg-amber-500/15 text-amber-500 border-amber-500/30",
+  low: "bg-red-500/15 text-red-500 border-red-500/30",
+};
+
+function isHeic(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return (
+    name.endsWith(".heic") ||
+    name.endsWith(".heif") ||
+    file.type === "image/heic" ||
+    file.type === "image/heif"
+  );
+}
+
+async function compressImage(file: File): Promise<{ blob: Blob; contentType: string }> {
+  // Convert HEIC to JPEG on the client before uploading
+  if (isHeic(file)) {
+    const heic2any = (await import("heic2any")).default;
+    const jpegBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+    const converted = Array.isArray(jpegBlob) ? jpegBlob[0] : jpegBlob;
+    return compressImage(new File([converted], file.name.replace(/\.hei[cf]$/i, ".jpg"), { type: "image/jpeg" }));
+  }
+
   return new Promise((resolve, reject) => {
     const img = new Image();
     const canvas = document.createElement("canvas");
@@ -75,7 +115,7 @@ async function compressImage(file: File): Promise<Blob> {
             reject(new Error("Failed to compress image"));
             return;
           }
-          resolve(blob);
+          resolve({ blob, contentType: "image/jpeg" });
         },
         "image/jpeg",
         0.85
@@ -117,12 +157,27 @@ export function AddFoodDialog({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   const generateUploadUrl = useMutation(api.nutrition.generateUploadUrl);
   const analyzeFoodImage = useAction(api.nutritionAi.analyzeFoodImage);
   const saveFoodEntry = useMutation(api.nutrition.saveFoodEntry);
 
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
   const resetState = useCallback(() => {
+    stopCamera();
     setStep(isPaidUser ? "upload" : "manual");
     setMealType(getDefaultMealType());
     setImagePreview(null);
@@ -130,6 +185,8 @@ export function AddFoodDialog({
     setResult(null);
     setError(null);
     setSaving(false);
+    setShowCamera(false);
+    setCameraError(null);
     setManualForm({
       foodName: "",
       servingSize: "",
@@ -140,31 +197,52 @@ export function AddFoodDialog({
       fiber: 0,
       sugar: 0,
     });
-  }, [isPaidUser]);
+  }, [isPaidUser, stopCamera]);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const dismissCamera = useCallback(() => {
+    stopCamera();
+    setShowCamera(false);
+  }, [stopCamera]);
 
-    setError(null);
+  const startCamera = async () => {
+    setCameraError(null);
 
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = () => setImagePreview(reader.result as string);
-    reader.readAsDataURL(file);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError("Camera not supported in this browser");
+      return;
+    }
 
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setShowCamera(true);
+    } catch (err) {
+      const domErr = err instanceof DOMException ? err : null;
+      if (domErr?.name === "NotAllowedError") {
+        setCameraError("Camera permission denied. Please allow camera access and try again.");
+      } else if (domErr?.name === "NotFoundError") {
+        setCameraError("No camera found on this device");
+      } else {
+        setCameraError("Could not access camera");
+      }
+    }
+  };
+
+  const processAndAnalyze = async (blob: Blob, contentType: string, previewUrl: string | null) => {
+    setImagePreview(previewUrl);
     setStep("analyzing");
 
     try {
-      // Compress image
-      const compressed = await compressImage(file);
-
-      // Upload to Convex storage
       const uploadUrl = await generateUploadUrl();
       const uploadResult = await fetch(uploadUrl, {
         method: "POST",
-        headers: { "Content-Type": "image/jpeg" },
-        body: compressed,
+        headers: { "Content-Type": contentType },
+        body: blob,
       });
 
       if (!uploadResult.ok) {
@@ -174,16 +252,78 @@ export function AddFoodDialog({
       const { storageId: sid } = await uploadResult.json();
       setStorageId(sid);
 
-      // Analyze with AI
       const analysis = await analyzeFoodImage({ storageId: sid });
       setResult(analysis as AnalysisResult);
       setStep("results");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to analyze image"
-      );
+      setError(err instanceof Error ? err.message : "Failed to analyze image");
       setStep("upload");
     }
+  };
+
+  const capturePhoto = async () => {
+    if (!videoRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    const maxSize = 1024;
+    let width = video.videoWidth;
+    let height = video.videoHeight;
+
+    if (width > maxSize || height > maxSize) {
+      if (width > height) {
+        height = (height / width) * maxSize;
+        width = maxSize;
+      } else {
+        width = (width / height) * maxSize;
+        height = maxSize;
+      }
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(video, 0, 0, width, height);
+
+    dismissCamera();
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.85)
+    );
+
+    if (!blob) {
+      setError("Failed to capture photo");
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(blob);
+    await processAndAnalyze(blob, "image/jpeg", previewUrl);
+  };
+
+  useEffect(() => {
+    if (!open) {
+      resetState();
+    }
+  }, [open, resetState]);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setError(null);
+
+    // Show preview (HEIC can't be previewed in most browsers)
+    let previewUrl: string | null = null;
+    if (!isHeic(file)) {
+      previewUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    const { blob: compressed, contentType } = await compressImage(file);
+    await processAndAnalyze(compressed, contentType, previewUrl);
   };
 
   const handleSave = async () => {
@@ -216,14 +356,14 @@ export function AddFoodDialog({
   };
 
   const handleRetake = () => {
+    dismissCamera();
+    setCameraError(null);
     setStep("upload");
     setImagePreview(null);
     setStorageId(null);
     setResult(null);
     setError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleManualSave = async () => {
@@ -258,18 +398,15 @@ export function AddFoodDialog({
     if (!isOpen) resetState();
   };
 
-  const mealTypes: { value: MealType; label: string }[] = [
-    { value: "breakfast", label: "Breakfast" },
-    { value: "lunch", label: "Lunch" },
-    { value: "dinner", label: "Dinner" },
-    { value: "snack", label: "Snack" },
-  ];
+  function getStepDescription(): string {
+    if (step === "upload" && showCamera) return "Point at your food and tap to capture";
+    if (step === "upload") return "Take or upload a photo of your food";
+    if (step === "analyzing") return "Analyzing your food...";
+    if (step === "results") return "Review nutrition estimates";
+    return "Enter food details manually";
+  }
 
-  const confidenceColors = {
-    high: "bg-green-500/15 text-green-500 border-green-500/30",
-    medium: "bg-amber-500/15 text-amber-500 border-amber-500/30",
-    low: "bg-red-500/15 text-red-500 border-red-500/30",
-  };
+  const stepDescription = getStepDescription();
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -285,12 +422,7 @@ export function AddFoodDialog({
             </div>
             <div>
               <DialogTitle>Add Food</DialogTitle>
-              <DialogDescription>
-                {step === "upload" && "Upload a photo of your food"}
-                {step === "analyzing" && "Analyzing your food..."}
-                {step === "results" && "Review nutrition estimates"}
-                {step === "manual" && "Enter food details manually"}
-              </DialogDescription>
+              <DialogDescription>{stepDescription}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -299,7 +431,7 @@ export function AddFoodDialog({
           {/* Meal Type Selector */}
           {(step === "upload" || step === "manual") && (
             <div className="flex gap-2">
-              {mealTypes.map(({ value, label }) => (
+              {MEAL_TYPES.map(({ value, label }) => (
                 <button
                   key={value}
                   onClick={() => setMealType(value)}
@@ -316,24 +448,67 @@ export function AddFoodDialog({
           )}
 
           {/* Upload Area */}
-          {step === "upload" && (
+          {step === "upload" && !showCamera && (
             <div className="space-y-3">
-              <label className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 transition-colors">
-                <Camera className="w-10 h-10 text-muted-foreground mb-3" />
-                <p className="text-sm font-medium">
-                  Upload a photo of your food
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Take a photo or choose from files
-                </p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileSelect}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  className="flex flex-col items-center justify-center h-36 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 transition-colors"
+                >
+                  <Camera className="w-8 h-8 text-muted-foreground mb-2" />
+                  <p className="text-sm font-medium">Take Photo</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Use camera
+                  </p>
+                </button>
+                <label className="flex flex-col items-center justify-center h-36 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 transition-colors">
+                  <ImagePlus className="w-8 h-8 text-muted-foreground mb-2" />
+                  <p className="text-sm font-medium">Upload Photo</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    From files
+                  </p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                  />
+                </label>
+              </div>
+              {cameraError && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm">
+                  {cameraError}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Camera Viewfinder */}
+          {step === "upload" && showCamera && (
+            <div className="relative">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-64 rounded-xl bg-black object-cover"
+              />
+              <button
+                type="button"
+                onClick={dismissCamera}
+                className="absolute top-2 right-2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="absolute bottom-3 left-0 right-0 flex justify-center">
+                <button
+                  type="button"
+                  onClick={capturePhoto}
+                  className="w-14 h-14 rounded-full border-4 border-white bg-white/30 hover:bg-white/50 transition-colors"
                 />
-              </label>
+              </div>
             </div>
           )}
 
@@ -373,14 +548,7 @@ export function AddFoodDialog({
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { key: "calories", label: "Calories", unit: "kcal" },
-                  { key: "protein", label: "Protein", unit: "g" },
-                  { key: "carbs", label: "Carbs", unit: "g" },
-                  { key: "fat", label: "Fat", unit: "g" },
-                  { key: "fiber", label: "Fiber", unit: "g" },
-                  { key: "sugar", label: "Sugar", unit: "g" },
-                ].map(({ key, label, unit }) => (
+                {MACRO_FIELDS.map(({ key, label, unit }) => (
                   <div key={key}>
                     <label className="text-xs text-muted-foreground">
                       {label} ({unit})
@@ -446,7 +614,7 @@ export function AddFoodDialog({
                 </div>
                 <span
                   className={`px-2 py-1 text-xs font-medium rounded-full border ${
-                    confidenceColors[result.confidence]
+                    CONFIDENCE_COLORS[result.confidence]
                   }`}
                 >
                   {result.confidence}
@@ -455,14 +623,7 @@ export function AddFoodDialog({
 
               {/* Macro Inputs */}
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { key: "calories", label: "Calories", unit: "kcal" },
-                  { key: "protein", label: "Protein", unit: "g" },
-                  { key: "carbs", label: "Carbs", unit: "g" },
-                  { key: "fat", label: "Fat", unit: "g" },
-                  { key: "fiber", label: "Fiber", unit: "g" },
-                  { key: "sugar", label: "Sugar", unit: "g" },
-                ].map(({ key, label, unit }) => (
+                {MACRO_FIELDS.map(({ key, label, unit }) => (
                   <div key={key}>
                     <label className="text-xs text-muted-foreground">
                       {label} ({unit})

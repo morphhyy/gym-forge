@@ -9,6 +9,7 @@ import {
   Dumbbell,
   Flame,
   Footprints,
+  ListPlus,
   Moon,
   Repeat,
   Timer,
@@ -19,6 +20,7 @@ import { DumbbellIcon } from "@/app/components/dumbbell-icon";
 import {
   PLAN_PDF_FILENAME,
   PLAN_PDF_URL,
+  USE_PLAN_URL,
   deskFixes,
   exerciseGifSrc,
   keyRules,
@@ -188,8 +190,9 @@ export default function RecompPlanPage() {
                 PDF
               </a>
             </span>
-            <Link href="/sign-up" className="btn btn-primary">
-              Get Started
+            <Link href={USE_PLAN_URL} className="btn btn-primary">
+              <ListPlus className="w-4 h-4" />
+              Use this plan
             </Link>
           </div>
         </div>
@@ -212,7 +215,11 @@ export default function RecompPlanPage() {
             muscle at the same time. Dal bhat stays on the plate.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 mb-12">
-            <a href="#workouts" className="btn btn-primary text-base px-6 py-3">
+            <Link href={USE_PLAN_URL} className="btn btn-primary text-base px-6 py-3">
+              <ListPlus className="w-5 h-5" />
+              Use this plan
+            </Link>
+            <a href="#workouts" className="btn btn-secondary text-base px-6 py-3">
               See the workouts
               <ArrowRight className="w-5 h-5" />
             </a>
@@ -443,13 +450,13 @@ export default function RecompPlanPage() {
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-2xl sm:text-3xl font-bold mb-3">Take the plan to the gym</h2>
           <p className="text-muted-foreground mb-8">
-            Grab the 12-page PDF with the shopping list and a 16-week tracker, or build the split in GymForge and log
-            every set.
+            Add all 5 workouts to your GymForge plans in one tap, then log every set. You can tweak any exercise before
+            saving. Prefer paper? Grab the 12-page PDF with the shopping list and a 16-week tracker.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link href="/sign-up" className="btn btn-primary text-base px-6 py-3">
-              Track it in GymForge
-              <ArrowRight className="w-5 h-5" />
+            <Link href={USE_PLAN_URL} className="btn btn-primary text-base px-6 py-3">
+              <ListPlus className="w-5 h-5" />
+              Use this plan in GymForge
             </Link>
             <PdfButton className="text-base px-6 py-3" />
           </div>

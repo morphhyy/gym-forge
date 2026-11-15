@@ -2,11 +2,13 @@
 
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import {
+  Apple,
   ArrowRight,
   BarChart3,
   Bell,
   Brain,
   Calendar,
+  Camera,
   CheckCircle2,
   ClipboardList,
   Clock,
@@ -16,6 +18,7 @@ import {
   LineChart,
   Medal,
   MessageSquare,
+  PieChart,
   Repeat,
   Rocket,
   Share2,
@@ -23,11 +26,11 @@ import {
   Smartphone,
   Sparkles,
   Target,
-  Timer,
   TrendingDown,
   TrendingUp,
   Trophy,
   Users,
+  UtensilsCrossed,
   Zap,
 } from "lucide-react";
 import Link from "next/link";
@@ -671,6 +674,152 @@ export default function HowItWorksPage() {
         </div>
       </section>
 
+      {/* Nutrition Tracking */}
+      <section className="py-20 px-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full text-green-400 text-sm font-medium mb-4">
+                <Apple className="w-4 h-4" />
+                Nutrition Tracking
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold mb-6">
+                Track What You Eat, Not Just What You Lift
+              </h2>
+              <p className="text-muted-foreground text-lg mb-8">
+                Complete your fitness picture with built-in nutrition tracking.
+                Log meals manually or snap a photo and let AI do the work.
+              </p>
+
+              <div className="space-y-6">
+                <div className="flex gap-4">
+                  <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Camera className="w-6 h-6 text-green-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">
+                      AI Food Scanning
+                      <span className="ml-2 text-xs bg-violet-500/10 text-violet-400 px-2 py-0.5 rounded-full">
+                        Pro
+                      </span>
+                    </h3>
+                    <p className="text-muted-foreground text-sm">
+                      Take a photo of your meal and GPT-4o Vision identifies the
+                      food and estimates calories, protein, carbs, fat, fiber,
+                      and sugar automatically.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <UtensilsCrossed className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">Manual Food Logging</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Quickly log meals by entering food name and macros. Track
+                      breakfast, lunch, dinner, and snacks throughout the day.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="w-12 h-12 bg-cyan-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <PieChart className="w-6 h-6 text-cyan-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">Daily Macro Tracking</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Visual progress bars show how close you are to hitting your
+                      daily targets for calories, protein, carbs, fat, fiber, and
+                      sugar.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="w-12 h-12 bg-violet-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-6 h-6 text-violet-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">
+                      AI Nutrition Goals
+                      <span className="ml-2 text-xs bg-violet-500/10 text-violet-400 px-2 py-0.5 rounded-full">
+                        Pro
+                      </span>
+                    </h3>
+                    <p className="text-muted-foreground text-sm">
+                      Enter your body metrics and fitness goal (bulk, cut, or
+                      maintain) and AI calculates personalized macro targets
+                      using the Mifflin-St Jeor equation.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-card rounded-2xl border border-border p-6">
+              <div className="flex items-center justify-between pb-4 border-b border-border mb-4">
+                <span className="font-semibold">Daily Nutrition</span>
+                <span className="text-sm text-muted-foreground">Today</span>
+              </div>
+              <div className="space-y-4">
+                {[
+                  { label: "Calories", current: 1680, goal: 2400, unit: "kcal", color: "bg-primary" },
+                  { label: "Protein", current: 142, goal: 180, unit: "g", color: "bg-blue-500" },
+                  { label: "Carbs", current: 165, goal: 260, unit: "g", color: "bg-amber-500" },
+                  { label: "Fat", current: 52, goal: 75, unit: "g", color: "bg-red-400" },
+                ].map((macro) => (
+                  <div key={macro.label}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="font-medium">{macro.label}</span>
+                      <span className="text-muted-foreground">
+                        {macro.current} / {macro.goal} {macro.unit}
+                      </span>
+                    </div>
+                    <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${macro.color}`}
+                        style={{ width: `${Math.min(100, (macro.current / macro.goal) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 pt-4 border-t border-border">
+                <div className="text-xs text-muted-foreground mb-3">
+                  Today&apos;s Meals
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { meal: "Breakfast", food: "Oatmeal with banana", cal: 380 },
+                    { meal: "Lunch", food: "Grilled chicken salad", cal: 620 },
+                    { meal: "Snack", food: "Protein shake", cal: 280 },
+                    { meal: "Dinner", food: "Salmon with rice", cal: 400 },
+                  ].map((entry) => (
+                    <div
+                      key={entry.meal}
+                      className="flex items-center justify-between p-2 bg-muted/30 rounded-lg text-sm"
+                    >
+                      <div>
+                        <span className="text-muted-foreground">
+                          {entry.meal}:
+                        </span>{" "}
+                        <span className="font-medium">{entry.food}</span>
+                      </div>
+                      <span className="text-muted-foreground">
+                        {entry.cal} kcal
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Additional Features */}
       <section className="py-20 px-6">
         <div className="max-w-6xl mx-auto">
@@ -1025,20 +1174,6 @@ export default function HowItWorksPage() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="card border-dashed border-2 border-border/50 bg-transparent">
-              <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center mb-4">
-                <Timer className="w-6 h-6 text-cyan-500" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Rest Timer</h3>
-              <p className="text-muted-foreground text-sm">
-                Built-in rest timer between sets with customizable durations.
-                Get notified when it&apos;s time for your next set.
-              </p>
-              <span className="inline-block mt-4 text-xs bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-full">
-                In Development
-              </span>
-            </div>
-
-            <div className="card border-dashed border-2 border-border/50 bg-transparent">
               <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mb-4">
                 <MessageSquare className="w-6 h-6 text-purple-500" />
               </div>
@@ -1048,20 +1183,6 @@ export default function HowItWorksPage() {
                 pain points, or things to remember for next time.
               </p>
               <span className="inline-block mt-4 text-xs bg-purple-500/10 text-purple-400 px-2 py-1 rounded-full">
-                Planned
-              </span>
-            </div>
-
-            <div className="card border-dashed border-2 border-border/50 bg-transparent">
-              <div className="w-12 h-12 bg-pink-500/10 rounded-xl flex items-center justify-center mb-4">
-                <BarChart3 className="w-6 h-6 text-pink-500" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Workout History</h3>
-              <p className="text-muted-foreground text-sm">
-                Browse past workouts in a calendar view. Quickly review what
-                you did on any given day and track patterns over time.
-              </p>
-              <span className="inline-block mt-4 text-xs bg-pink-500/10 text-pink-400 px-2 py-1 rounded-full">
                 Planned
               </span>
             </div>
@@ -1091,20 +1212,6 @@ export default function HowItWorksPage() {
               </p>
               <span className="inline-block mt-4 text-xs bg-green-500/10 text-green-400 px-2 py-1 rounded-full">
                 Exploring
-              </span>
-            </div>
-
-            <div className="card border-dashed border-2 border-border/50 bg-transparent">
-              <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mb-4">
-                <Repeat className="w-6 h-6 text-blue-500" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Superset Support</h3>
-              <p className="text-muted-foreground text-sm">
-                Group exercises into supersets, circuits, or drop sets. Log
-                them together for a more efficient workout flow.
-              </p>
-              <span className="inline-block mt-4 text-xs bg-blue-500/10 text-blue-400 px-2 py-1 rounded-full">
-                Planned
               </span>
             </div>
           </div>
