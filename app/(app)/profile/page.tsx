@@ -8,6 +8,8 @@ import { User, Settings, LogOut, Save, Check, Target, Scale, ChevronRight } from
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { RestTimerSettings } from "@/app/components/log/rest-timer-settings";
+import { YourDataSection } from "@/app/components/your-data-section";
+import { DeleteAccountSection } from "@/app/components/delete-account-section";
 
 export default function ProfilePage() {
   const { user: clerkUser } = useUser();
@@ -247,6 +249,9 @@ export default function ProfilePage() {
         <ChevronRight className="w-5 h-5 text-muted group-hover:text-foreground transition-colors" />
       </Link>
 
+      {/* Your Data: export / import */}
+      <YourDataSection units={userData?.units || "kg"} />
+
       {/* Danger Zone */}
       <div className="card border-danger/30">
         <h3 className="font-semibold text-danger mb-4">Sign Out</h3>
@@ -261,6 +266,8 @@ export default function ProfilePage() {
           Sign Out
         </button>
       </div>
+
+      <DeleteAccountSection />
     </div>
   );
 }

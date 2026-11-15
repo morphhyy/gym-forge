@@ -10,8 +10,6 @@ import {
   Plus,
   Repeat,
   Trash2,
-  TrendingDown,
-  TrendingUp,
 } from "lucide-react";
 import {
   Dialog,
@@ -26,11 +24,12 @@ import {
   parseWeight,
   SET_TYPE_META,
 } from "@/app/lib/workout-logger";
+import { ProgressionHint } from "@/app/components/progression-hint";
+import type { NextTarget } from "@/convex/lib/progression";
 import { PlateCalculatorDialog } from "./plate-calculator-dialog";
 import { SetRow, type SetRowProps } from "./set-row";
 import {
   setKey,
-  type ExerciseSuggestion,
   type LastTime,
   type LoggedSet,
   type LoggerExercise,
@@ -48,7 +47,10 @@ export interface ExerciseCardProps extends RowHandlers {
   drafts: Record<string, SetDraft>;
   savingKeys: ReadonlySet<string>;
   lastTime?: LastTime;
-  suggestion?: ExerciseSuggestion;
+  /** Next-session target from the progression engine. */
+  target?: NextTarget | null;
+  /** Pre-fill this exercise's unlogged sets with the target. */
+  onApplyTarget?: (exerciseId: LoggerExercise["exerciseId"], weight: number, reps: number) => void;
   units: "kg" | "lb";
   disabled: boolean;
   onAddSet: (exerciseId: LoggerExercise["exerciseId"]) => void;
@@ -62,7 +64,8 @@ export function ExerciseCard({
   drafts,
   savingKeys,
   lastTime,
-  suggestion,
+  target,
+  onApplyTarget,
   units,
   disabled,
   onAddSet,
@@ -104,10 +107,19 @@ export function ExerciseCard({
           </p>
         </div>
 
-        {/* TODO(progression): render <ProgressionHint exerciseId={exerciseId} /> here
-            once it lands; it replaces the interim suggestion badge below. */}
-        {suggestion?.suggestion && !disabled && (
-          <SuggestionBadge suggestion={suggestion} units={units} />
+        {target && !disabled && (
+          <ProgressionHint
+            exerciseId={entry.exerciseId}
+            target={target}
+            units={units}
+            compact
+            className="shrink-0"
+            onApply={
+              onApplyTarget
+                ? ({ weight, reps }) => onApplyTarget(entry.exerciseId, weight, reps)
+                : undefined
+            }
+          />
         )}
 
         {!disabled && (
@@ -270,43 +282,5 @@ function MenuButton({
       <span className="flex-1 text-left">{label}</span>
       {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </button>
-  );
-}
-
-function SuggestionBadge({
-  suggestion,
-  units,
-}: {
-  suggestion: ExerciseSuggestion;
-  units: "kg" | "lb";
-}) {
-  return (
-    <div
-      className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium shrink-0 ${
-        suggestion.suggestion === "increase"
-          ? "bg-primary/10 text-primary"
-          : suggestion.suggestion === "decrease"
-            ? "bg-orange-500/10 text-orange-500"
-            : "bg-muted text-muted-foreground"
-      }`}
-    >
-      {suggestion.suggestion === "increase" ? (
-        <>
-          <TrendingUp className="w-3 h-3" />
-          <span>
-            {suggestion.suggestedWeight} {units}
-          </span>
-        </>
-      ) : suggestion.suggestion === "decrease" ? (
-        <>
-          <TrendingDown className="w-3 h-3" />
-          <span>
-            {suggestion.suggestedWeight} {units}
-          </span>
-        </>
-      ) : (
-        <span>Maintain</span>
-      )}
-    </div>
   );
 }

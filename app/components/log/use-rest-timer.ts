@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { showLocalNotification } from "@/app/lib/notifications";
 
 /**
  * Rest timer driven by a target end timestamp (not by counting interval
@@ -112,6 +113,15 @@ export function useRestTimer(options: { sound: boolean; vibrate: boolean }) {
       if (Date.now() - timer.endAt < 5000) {
         if (optionsRef.current.sound) beep();
         if (optionsRef.current.vibrate) vibrate();
+        // Tab in the background (phone locked / switched app): the beep may
+        // not be heard, so also raise a system notification if permitted.
+        if (document.visibilityState === "hidden") {
+          void showLocalNotification("Rest over", "Time for your next set", {
+            tag: "rest-timer",
+            url: "/log",
+            renotify: true,
+          });
+        }
       }
       setTimer(null);
     };

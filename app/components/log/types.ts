@@ -45,12 +45,6 @@ export type LastTimeSet = {
 
 export type LastTime = { date: string; sets: LastTimeSet[] };
 
-export type ExerciseSuggestion = {
-  suggestion: "increase" | "maintain" | "decrease" | null;
-  suggestedWeight?: number;
-  lastWeight?: number;
-};
-
 export const setKey = (exerciseId: string, setIndex: number) => `${exerciseId}-${setIndex}`;
 
 /**

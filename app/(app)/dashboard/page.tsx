@@ -16,6 +16,7 @@ import {
 import { format } from "date-fns";
 import { StreakBadge } from "@/app/components/streak-badge";
 import { WeeklyProgressRing } from "@/app/components/weekly-progress-ring";
+import { WeeklyRecap } from "@/app/components/weekly-recap";
 
 export default function DashboardPage() {
   const today = format(new Date(), "yyyy-MM-dd");
@@ -105,6 +106,9 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Weekly Recap (dismissible) */}
+      <WeeklyRecap today={today} />
 
       {/* Quick Actions */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

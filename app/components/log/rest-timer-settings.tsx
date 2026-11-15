@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useMutation } from "convex/react";
-import { Timer, Volume2, Vibrate } from "lucide-react";
+import { Bell, Timer, Volume2, Vibrate } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { DEFAULT_REST_SECONDS, formatDuration } from "@/app/lib/workout-logger";
+import {
+  getNotificationPermission,
+  requestNotificationPermission,
+  type NotificationPermissionState,
+} from "@/app/lib/notifications";
 
 const PRESETS = [60, 90, 120, 180, 240];
 
@@ -28,6 +33,15 @@ export function RestTimerSettings({
   const sound = restTimerSound ?? true;
   const vibrate = restTimerVibrate ?? true;
   const [custom, setCustom] = useState("");
+  // Notification is browser-only: "unsupported" during SSR, real value after
+  // hydration; `requested` holds the answer once the user is prompted.
+  const browserPermission = useSyncExternalStore(
+    noopSubscribe,
+    getNotificationPermission,
+    () => "unsupported" as const
+  );
+  const [requested, setRequested] = useState<NotificationPermissionState | null>(null);
+  const notifyPermission = requested ?? browserPermission;
 
   const save = async (patch: {
     defaultRestSeconds?: number;
@@ -112,10 +126,28 @@ export function RestTimerSettings({
           checked={vibrate}
           onChange={(v) => save({ restTimerVibrate: v })}
         />
+        {notifyPermission !== "unsupported" && (
+          <Toggle
+            icon={<Bell className="w-4 h-4" />}
+            label="Notify when rest is over"
+            hint={
+              notifyPermission === "denied"
+                ? "Blocked — allow notifications for this site in your browser settings"
+                : "Alerts you if the app is in the background or your screen is locked"
+            }
+            checked={notifyPermission === "granted"}
+            onChange={async () => {
+              if (notifyPermission !== "default") return;
+              setRequested(await requestNotificationPermission());
+            }}
+          />
+        )}
       </div>
     </div>
   );
 }
+
+const noopSubscribe = () => () => {};
 
 function Toggle({
   icon,

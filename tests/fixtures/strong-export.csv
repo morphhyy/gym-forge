@@ -1,0 +1,13 @@
+Date,Workout Name,Duration,Exercise Name,Set Order,Weight,Reps,Distance,Seconds,Notes,Workout Notes,RPE
+2024-08-01 18:23:30,"Push Day",1h 5m,"Bench Press (Barbell)",W,40.0,10,0,0,"","Felt strong, good pump",
+2024-08-01 18:23:30,"Push Day",1h 5m,"Bench Press (Barbell)",1,80.0,8,0,0,"","Felt strong, good pump",8
+2024-08-01 18:23:30,"Push Day",1h 5m,"Bench Press (Barbell)",2,82.5,6,0,0,"Paused reps","Felt strong, good pump",9.5
+2024-08-01 18:23:30,"Push Day",1h 5m,"Shoulder Press (Dumbbell)",1,24.0,10,0,0,"","Felt strong, good pump",
+2024-08-01 18:23:30,"Push Day",1h 5m,"Triceps Pushdown (Cable - Straight Bar)",1,30.0,12,0,0,"","Felt strong, good pump",
+2024-08-01 18:23:30,"Push Day",1h 5m,"Plank",1,0,0,0,60,"","Felt strong, good pump",
+2024-08-01 18:23:30,"Push Day",1h 5m,"Bench Press (Barbell)",Rest Timer,0,0,0,120,"","Felt strong, good pump",
+2024-08-03 09:00:00,"Leg Day",58m,"Squat (Barbell)",1,100,5,0,0,"","",
+2024-08-03 09:00:00,"Leg Day",58m,"Squat (Barbell)",2,100,5,0,0,"","",
+2024-08-03 09:00:00,"Leg Day",58m,"Zercher Squat",1,60,8,0,0,"","",
+2024-08-03 17:30:00,"Arms",30m,"Bicep Curl (Dumbbell)",1,14,12,0,0,"","",
+2024-08-03 17:30:00,"Arms",30m,"Running (Treadmill)",1,0,,5,1800,"","",

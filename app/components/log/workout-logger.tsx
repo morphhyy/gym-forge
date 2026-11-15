@@ -140,10 +140,32 @@ export function WorkoutLogger({ date }: { date: string }) {
     api.sessions.getLastWeightsForExercises,
     exerciseIds.length > 0 ? { exerciseIds, beforeDate: date } : "skip"
   ) as Record<string, LastTime> | undefined;
-  const suggestions = useQuery(
-    api.progress.getBatchExerciseSuggestions,
-    exerciseIds.length > 0 ? { exerciseIds } : "skip"
+  const nextTargets = useQuery(
+    api.progression.getNextTargets,
+    exerciseIds.length > 0
+      ? {
+          exerciseIds,
+          weekday: new Date(`${date}T00:00:00`).getDay(),
+          // Don't let today's half-logged sets move today's target
+          ...(sessionData?._id ? { excludeSessionId: sessionData._id } : {}),
+        }
+      : "skip"
   );
+
+  // Fill every not-yet-logged set of an exercise with the suggested target.
+  const onApplyTarget = (exerciseId: string, weight: number, reps: number) => {
+    const entry = entries.find((e) => e.exerciseId === exerciseId);
+    if (!entry) return;
+    setDrafts((prev) => {
+      const next = { ...prev };
+      entry.sets.forEach((_, setIndex) => {
+        const key = setKey(exerciseId, setIndex);
+        if (logged.has(key)) return;
+        next[key] = { ...next[key], weight: String(weight), reps: String(reps) };
+      });
+      return next;
+    });
+  };
 
   const lastSetFor = (exerciseId: string, setIndex: number) => {
     const sets = lastTimes?.[exerciseId]?.sets;
@@ -488,7 +510,8 @@ export function WorkoutLogger({ date }: { date: string }) {
                 drafts={drafts}
                 savingKeys={savingKeys}
                 lastTime={lastTimes?.[entry.exerciseId]}
-                suggestion={suggestions?.[entry.exerciseId]}
+                target={nextTargets?.[entry.exerciseId]}
+                onApplyTarget={onApplyTarget}
                 units={units}
                 disabled={isCompleted}
                 registerWeightInput={registerWeightInput}
