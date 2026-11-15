@@ -37,6 +37,7 @@ const STEPS = [
   "bodyWeights",
   "nutritionGoals",
   "exercises", // custom exercises only (by_user index)
+  "rateLimits", // rows keyed by the Clerk user id (e.g. ai_plan_refund)
   "users",
 ] as const;
 type Step = (typeof STEPS)[number];
@@ -94,6 +95,16 @@ async function deleteStep(
         // Defensive: never delete global catalog entries
         if (!r.isGlobal) await ctx.db.delete(r._id);
       }
+      return { deleted: rows.length, done: rows.length < budget };
+    }
+    case "rateLimits": {
+      // Per-user limits (users.refundAIGeneration) use the Clerk id as the
+      // identifier; anonymous ones (feedback) use a hashed IP and can't match.
+      const rows = await ctx.db
+        .query("rateLimits")
+        .withIndex("by_identifier_action", (q) => q.eq("identifier", userId))
+        .take(budget);
+      for (const r of rows) await ctx.db.delete(r._id);
       return { deleted: rows.length, done: rows.length < budget };
     }
     case "users": {
