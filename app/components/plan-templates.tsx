@@ -20,6 +20,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { RECOMP_TEMPLATE_ID, workouts as recompWorkouts } from "@/app/plans/recomp/data";
+import { RECOMP_ROUTINES, routineForDay } from "@/app/lib/workout-routines";
 
 type TemplateExercise = {
   name: string;
@@ -35,6 +36,9 @@ type TemplateDay = {
   weekday: number;
   name: string;
   exercises: TemplateExercise[];
+  /** Filled for every day by withRoutines() below. */
+  warmup?: string[];
+  cooldown?: string[];
 };
 
 type Template = {
@@ -69,7 +73,7 @@ const RECOMP_TEMPLATE: Template = {
   })),
 };
 
-const TEMPLATES: Template[] = [
+const BASE_TEMPLATES: Template[] = [
   RECOMP_TEMPLATE,
   {
     id: "arnold-split",
@@ -443,11 +447,36 @@ const TEMPLATES: Template[] = [
   },
 ];
 
+/**
+ * Every template day gets a warm-up and cool-down: the recomp plan uses its
+ * own routines verbatim, the others get one that fits the day's focus and
+ * ends with ramp-up sets of the first exercise.
+ */
+function withRoutines(template: Template): Template {
+  return {
+    ...template,
+    days: template.days.map((day) => {
+      const routine =
+        (template.id === RECOMP_TEMPLATE_ID ? RECOMP_ROUTINES[day.weekday] : undefined) ??
+        routineForDay(day.name, day.exercises[0]?.name);
+      return {
+        ...day,
+        warmup: day.warmup ?? routine.warmup,
+        cooldown: day.cooldown ?? routine.cooldown,
+      };
+    }),
+  };
+}
+
+const TEMPLATES: Template[] = BASE_TEMPLATES.map(withRoutines);
+
 export type TemplatePlan = {
   planName: string;
   days: {
     weekday: number;
     name?: string;
+    warmup?: string[];
+    cooldown?: string[];
     exercises: {
       exerciseId: Id<"exercises">;
       exerciseName: string;
@@ -500,6 +529,8 @@ export function useTemplateToPlan() {
         days: template.days.map((day) => ({
           weekday: day.weekday,
           name: day.name,
+          warmup: day.warmup,
+          cooldown: day.cooldown,
           exercises: day.exercises.map((ex, idx) => ({
             exerciseId: ids.get(ex.name.toLowerCase()) as Id<"exercises">,
             exerciseName: ex.name,
@@ -616,6 +647,12 @@ export function PlanTemplates({
                         <h4 className="text-sm font-medium text-primary">
                           {day.name}
                         </h4>
+                        {day.warmup && day.cooldown && (
+                          <p className="text-xs text-muted-foreground">
+                            Warm-up · {day.warmup.length} steps · Cool-down ·{" "}
+                            {day.cooldown.length} steps
+                          </p>
+                        )}
                         <div className="space-y-0.5">
                           {day.exercises.map((ex, idx) => (
                             <div

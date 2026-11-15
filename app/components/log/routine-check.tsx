@@ -6,30 +6,9 @@ import { cn } from "@/lib/utils";
 
 export type Routine = "warmup" | "cooldown";
 
-const ROUTINES: Record<
-  Routine,
-  { title: string; duration: string; icon: typeof Sun; steps: string[] }
-> = {
-  warmup: {
-    title: "Warm-up",
-    duration: "8–10 min",
-    icon: Sun,
-    steps: [
-      "5 min easy cardio (bike, rower or brisk walk)",
-      "Dynamic mobility: arm circles, leg swings, hip openers",
-      "1–2 light ramp-up sets of your first lift",
-    ],
-  },
-  cooldown: {
-    title: "Cool-down",
-    duration: "5–7 min",
-    icon: Snowflake,
-    steps: [
-      "2–3 min easy walk or bike to bring your heart rate down",
-      "Static stretches for the muscles you trained, 20–30 s each",
-      "A minute of slow, deep breathing",
-    ],
-  },
+const META: Record<Routine, { title: string; duration: string; icon: typeof Sun }> = {
+  warmup: { title: "Warm-up", duration: "8–10 min", icon: Sun },
+  cooldown: { title: "Cool-down", duration: "5–7 min", icon: Snowflake },
 };
 
 /**
@@ -38,17 +17,20 @@ const ROUTINES: Record<
  */
 export function RoutineCheck({
   routine,
+  steps,
   done,
   disabled,
   onToggle,
 }: {
   routine: Routine;
+  /** The day's routine (from the plan, or suggested for the day). */
+  steps: string[];
   done: boolean;
   disabled?: boolean;
   onToggle: (done: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const { title, duration, icon: Icon, steps } = ROUTINES[routine];
+  const { title, duration, icon: Icon } = META[routine];
 
   return (
     <div className={cn("card py-3 transition-colors", done && "border-primary/40")}>
@@ -90,7 +72,7 @@ export function RoutineCheck({
           <ChevronDown className={cn("w-5 h-5 transition-transform", open && "rotate-180")} />
         </button>
       </div>
-      {open && (
+      {open && steps.length > 0 && (
         <ul className="mt-2 ml-10 space-y-1 text-sm text-muted-foreground list-disc pl-4">
           {steps.map((step) => (
             <li key={step}>{step}</li>

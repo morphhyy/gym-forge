@@ -27,6 +27,7 @@ import { primeAudio, useRestTimer } from "./use-rest-timer";
 import { useWakeLock } from "./use-wake-lock";
 import { WorkoutSummary } from "./workout-summary";
 import { RoutineCheck, type Routine } from "./routine-check";
+import { routineForDay } from "@/app/lib/workout-routines";
 import {
   resolveSetValues,
   setKey,
@@ -101,6 +102,17 @@ export function WorkoutLogger({ date }: { date: string }) {
 
   const isToday = date === format(new Date(), "yyyy-MM-dd");
   const isCompleted = sessionData?.completedAt != null;
+
+  // The plan day's own routine (templates fill one in), else one suggested
+  // from the day's name and first exercise.
+  const dayRoutine = useMemo(() => {
+    const day = todayTemplate?.day;
+    const suggested = routineForDay(day?.name, todayTemplate?.exercises?.[0]?.exercise?.name);
+    return {
+      warmup: day?.warmup?.length ? day.warmup : suggested.warmup,
+      cooldown: day?.cooldown?.length ? day.cooldown : suggested.cooldown,
+    };
+  }, [todayTemplate]);
   const inProgress = !!sessionData && !isCompleted;
 
   // Keep the screen on at the gym while a session is running
@@ -526,6 +538,7 @@ export function WorkoutLogger({ date }: { date: string }) {
         <div className="space-y-4">
           <RoutineCheck
             routine="warmup"
+            steps={dayRoutine.warmup}
             done={sessionData?.warmupCompletedAt != null}
             onToggle={(done) => void onToggleRoutine("warmup", done)}
           />
@@ -589,6 +602,7 @@ export function WorkoutLogger({ date }: { date: string }) {
 
           <RoutineCheck
             routine="cooldown"
+            steps={dayRoutine.cooldown}
             done={sessionData?.cooldownCompletedAt != null}
             onToggle={(done) => void onToggleRoutine("cooldown", done)}
           />

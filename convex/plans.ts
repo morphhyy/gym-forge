@@ -19,6 +19,26 @@ async function assertPlanExercisesUsable(
 }
 
 // Get user's active plan with all days and exercises
+const MAX_ROUTINE_STEPS = 30;
+const MAX_ROUTINE_STEP_LENGTH = 200;
+
+function assertRoutines(day: { warmup?: string[]; cooldown?: string[] }) {
+  for (const [label, steps] of [
+    ["Warm-up", day.warmup],
+    ["Cool-down", day.cooldown],
+  ] as const) {
+    if (!steps) continue;
+    if (
+      steps.length > MAX_ROUTINE_STEPS ||
+      steps.some((s) => s.length > MAX_ROUTINE_STEP_LENGTH)
+    ) {
+      throw new Error(
+        `${label} can have at most ${MAX_ROUTINE_STEPS} steps of ${MAX_ROUTINE_STEP_LENGTH} characters`
+      );
+    }
+  }
+}
+
 export const getActivePlan = query({
   args: {},
   handler: async (ctx) => {
@@ -187,6 +207,8 @@ export const createPlan = mutation({
       v.object({
         weekday: v.number(),
         name: v.optional(v.string()),
+        warmup: v.optional(v.array(v.string())),
+        cooldown: v.optional(v.array(v.string())),
         exercises: v.array(
           v.object({
             exerciseId: v.id("exercises"),
@@ -234,10 +256,13 @@ export const createPlan = mutation({
 
     // Create plan days and exercises
     for (const day of args.days) {
+      assertRoutines(day);
       const planDayId = await ctx.db.insert("planDays", {
         planId,
         weekday: day.weekday,
         name: day.name,
+        warmup: day.warmup,
+        cooldown: day.cooldown,
         createdAt: Date.now(),
       });
 
@@ -276,6 +301,8 @@ export const updatePlan = mutation({
       v.object({
         weekday: v.number(),
         name: v.optional(v.string()),
+        warmup: v.optional(v.array(v.string())),
+        cooldown: v.optional(v.array(v.string())),
         exercises: v.array(
           v.object({
             exerciseId: v.id("exercises"),
@@ -326,10 +353,13 @@ export const updatePlan = mutation({
 
     // Create new plan days and exercises
     for (const day of args.days) {
+      assertRoutines(day);
       const planDayId = await ctx.db.insert("planDays", {
         planId: args.planId,
         weekday: day.weekday,
         name: day.name,
+        warmup: day.warmup,
+        cooldown: day.cooldown,
         createdAt: Date.now(),
       });
 
@@ -592,6 +622,8 @@ export const copySharedPlan = mutation({
         planId: newPlanId,
         weekday: day.weekday,
         name: day.name,
+        warmup: day.warmup,
+        cooldown: day.cooldown,
         createdAt: Date.now(),
       });
 

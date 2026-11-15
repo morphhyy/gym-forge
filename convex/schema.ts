@@ -63,6 +63,10 @@ export default defineSchema({
     planId: v.id("plans"),
     weekday: v.number(), // 0=Sunday, 6=Saturday (matches JS Date.getDay())
     name: v.optional(v.string()), // e.g., "Push Day"
+    // Warm-up / cool-down steps shown in the logger (absent = suggested
+    // from the day's name; see app/lib/workout-routines.ts)
+    warmup: v.optional(v.array(v.string())),
+    cooldown: v.optional(v.array(v.string())),
     createdAt: v.number(),
   }).index("by_plan", ["planId"]),
 

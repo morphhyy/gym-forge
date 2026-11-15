@@ -43,7 +43,16 @@ type PlanExercise = {
 type PlanDay = {
   weekday: number;
   name?: string;
+  /** One step per entry; blank lines are dropped on save. */
+  warmup?: string[];
+  cooldown?: string[];
   exercises: PlanExercise[];
+};
+
+/** Drop blank steps; an empty routine is stored as absent. */
+const cleanSteps = (steps?: string[]) => {
+  const kept = (steps ?? []).map((s) => s.trim()).filter(Boolean);
+  return kept.length > 0 ? kept : undefined;
 };
 
 export default function PlanPage() {
@@ -102,6 +111,8 @@ export default function PlanPage() {
           (day: {
             weekday: number;
             name?: string;
+            warmup?: string[];
+            cooldown?: string[];
             exercises: {
               exerciseId: Id<"exercises">;
               exercise?: { name: string } | null;
@@ -111,6 +122,8 @@ export default function PlanPage() {
           }) => ({
             weekday: day.weekday,
             name: day.name,
+            warmup: day.warmup,
+            cooldown: day.cooldown,
             exercises: day.exercises.map(
               (
                 e: {
@@ -188,6 +201,8 @@ export default function PlanPage() {
       plan.days.map((day) => ({
         weekday: day.weekday,
         name: day.name,
+        warmup: day.warmup,
+        cooldown: day.cooldown,
         exercises: day.exercises,
       }))
     );
@@ -353,6 +368,18 @@ export default function PlanPage() {
     );
   };
 
+  const updateDayRoutine = (
+    dayIndex: number,
+    routine: "warmup" | "cooldown",
+    text: string
+  ) => {
+    setDays((prev) =>
+      prev.map((day, i) =>
+        i === dayIndex ? { ...day, [routine]: text ? text.split("\n") : undefined } : day
+      )
+    );
+  };
+
   const savePlan = async () => {
     setIsSaving(true);
     const toastId = toast.loading("Saving plan...");
@@ -362,6 +389,8 @@ export default function PlanPage() {
         days: days.map((day) => ({
           weekday: day.weekday,
           name: day.name,
+          warmup: cleanSteps(day.warmup),
+          cooldown: cleanSteps(day.cooldown),
           exercises: day.exercises.map((e) => ({
             exerciseId: e.exerciseId,
             order: e.order,
@@ -832,6 +861,39 @@ export default function PlanPage() {
                     className="input max-w-xs"
                   />
                 </div>
+
+                {/* Warm-up / cool-down (one step per line) */}
+                {day.exercises.length > 0 && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {(["warmup", "cooldown"] as const).map((routine) => (
+                      <div key={routine}>
+                        <label
+                          htmlFor={`${routine}-${day.weekday}`}
+                          className="block text-sm font-medium mb-2"
+                        >
+                          {routine === "warmup" ? "Warm-up" : "Cool-down"}{" "}
+                          <span className="font-normal text-muted-foreground">
+                            (one step per line)
+                          </span>
+                        </label>
+                        <textarea
+                          id={`${routine}-${day.weekday}`}
+                          value={(day[routine] ?? []).join("\n")}
+                          onChange={(e) =>
+                            updateDayRoutine(dayIndex, routine, e.target.value)
+                          }
+                          rows={5}
+                          placeholder={
+                            routine === "warmup"
+                              ? "e.g. 5 min easy bike\nArm circles · 10 each way"
+                              : "e.g. 3 min easy walk\nChest stretch · 30 s / side"
+                          }
+                          className="input w-full text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Exercises */}
                 <div>
