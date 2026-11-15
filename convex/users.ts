@@ -137,11 +137,17 @@ export const consumeAIGeneration = internalMutation({
   },
 });
 
-// Give back a reserved generation when the AI request itself failed
-// (e.g. OpenAI error / unparseable output), so users aren't charged for nothing.
+const MAX_AI_REFUNDS_PER_DAY = 3;
+const AI_REFUND_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// Give back a reserved generation. Only called by ai.generateWorkoutPlan for
+// clearly-unbilled infrastructure failures (network error, 429, 5xx) — never
+// for parse/validation failures or refusals. Capped at MAX_AI_REFUNDS_PER_DAY
+// per user (tracked in rateLimits) so refunds can't be farmed for unlimited
+// OpenAI calls. Returns whether a refund was granted.
 export const refundAIGeneration = internalMutation({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ refunded: boolean }> => {
     const userId = await requireAuth(ctx);
 
     const user = await ctx.db
@@ -149,12 +155,36 @@ export const refundAIGeneration = internalMutation({
       .withIndex("by_clerk_id", (q) => q.eq("clerkUserId", userId))
       .unique();
 
-    if (!user || user.isPaidUser) return;
+    if (!user || user.isPaidUser) return { refunded: false };
 
     const currentUsage = user.aiUsageCount ?? 0;
-    if (currentUsage > 0) {
-      await ctx.db.patch(user._id, { aiUsageCount: currentUsage - 1 });
+    if (currentUsage <= 0) return { refunded: false };
+
+    const now = Date.now();
+    const limit = await ctx.db
+      .query("rateLimits")
+      .withIndex("by_identifier_action", (q) =>
+        q.eq("identifier", userId).eq("action", "ai_plan_refund")
+      )
+      .first();
+
+    if (!limit) {
+      await ctx.db.insert("rateLimits", {
+        identifier: userId,
+        action: "ai_plan_refund",
+        count: 1,
+        windowStart: now,
+      });
+    } else if (now - limit.windowStart >= AI_REFUND_WINDOW_MS) {
+      await ctx.db.patch(limit._id, { count: 1, windowStart: now });
+    } else if (limit.count >= MAX_AI_REFUNDS_PER_DAY) {
+      return { refunded: false };
+    } else {
+      await ctx.db.patch(limit._id, { count: limit.count + 1 });
     }
+
+    await ctx.db.patch(user._id, { aiUsageCount: currentUsage - 1 });
+    return { refunded: true };
   },
 });
 

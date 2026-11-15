@@ -236,6 +236,7 @@ export function AIPlanGenerator({
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="e.g., I'm an intermediate lifter looking to build muscle. I can train 5 days a week and want to focus on upper body while maintaining legs. I prefer compound movements and have about 60 minutes per session."
                 rows={5}
+                maxLength={2000}
                 disabled={isGenerating}
               />
               <p className="text-xs text-muted-foreground mt-2">

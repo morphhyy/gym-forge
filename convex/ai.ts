@@ -7,6 +7,8 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
+const MAX_PROMPT_LENGTH = 2000;
+
 type GeneratedPlan = {
   planName: string;
   description: string;
@@ -71,26 +73,38 @@ export const generateWorkoutPlan = action({
       );
     }
 
-    // Atomically check + reserve one generation BEFORE calling OpenAI. The count
-    // is charged per generation (not per saved plan) so users can't bypass the
-    // limit by generating repeatedly without saving. Throws when the limit is
-    // reached; paid users are unlimited.
-    const { consumed } = await ctx.runMutation(
-      internal.users.consumeAIGeneration,
-      {}
-    );
-
-    try {
-      return await generatePlanWithOpenAI(ctx, openaiApiKey, args.prompt);
-    } catch (err) {
-      // Don't charge the user for a generation that never produced a plan.
-      if (consumed) {
-        await ctx.runMutation(internal.users.refundAIGeneration, {});
-      }
-      throw err;
+    // Validate input before any quota is consumed.
+    const prompt = args.prompt.trim();
+    if (!prompt) {
+      throw new Error("Please describe the plan you want.");
     }
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      throw new Error(
+        `Prompt is too long (max ${MAX_PROMPT_LENGTH} characters).`
+      );
+    }
+
+    // Usage is charged per generation (not per saved plan) so users can't
+    // bypass the limit by generating repeatedly without saving. The atomic
+    // check + increment happens inside generatePlanWithOpenAI right before the
+    // billed OpenAI call; it throws when the limit is reached (paid users are
+    // unlimited).
+    return await generatePlanWithOpenAI(ctx, openaiApiKey, prompt);
   },
 });
+
+/**
+ * True only for failures where OpenAI did not return a completion and so
+ * (almost certainly) didn't bill us: network/timeout errors, 429, 5xx.
+ */
+function isUnbilledInfraError(err: unknown): boolean {
+  if (err instanceof OpenAI.APIConnectionError) return true; // includes timeouts
+  if (err instanceof OpenAI.APIError) {
+    const status = err.status;
+    return status === 429 || (typeof status === "number" && status >= 500);
+  }
+  return false;
+}
 
 async function generatePlanWithOpenAI(
   ctx: ActionCtx,
@@ -162,20 +176,42 @@ Create a balanced, effective program that matches the user's goals, experience, 
     apiKey: openaiApiKey,
   });
 
-  // Use Responses API with structured output
-  const response = await openai.responses.parse({
-    model: "gpt-4o-2024-08-06",
-    input: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: prompt },
-    ],
-    text: {
-      format: zodTextFormat(WorkoutPlanSchema, "workout_plan"),
-    },
-    temperature: 0.7,
-    max_output_tokens: 2000,
-  });
+  // Reserve quota only now, immediately before the billed call, so failures in
+  // the (unbilled) preparation above never consume a generation.
+  const { consumed } = await ctx.runMutation(
+    internal.users.consumeAIGeneration,
+    {}
+  );
 
+  // Use Responses API with structured output
+  let response;
+  try {
+    response = await openai.responses.parse({
+      model: "gpt-4o-2024-08-06",
+      input: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: prompt },
+      ],
+      text: {
+        format: zodTextFormat(WorkoutPlanSchema, "workout_plan"),
+      },
+      temperature: 0.7,
+      max_output_tokens: 2000,
+    });
+  } catch (err) {
+    // Refund policy (fail-closed): only refund when OpenAI clearly did not
+    // return a completion — connection/timeout errors, 429, or 5xx. Anything
+    // else (parse/validation failures, refusals, content filter, truncation,
+    // 4xx caused by the input) may have been billed and is user-influenceable,
+    // so it is NOT refunded. Refunds are additionally capped per user per day
+    // in users.refundAIGeneration so even infra-error refunds can't be farmed.
+    if (consumed && isUnbilledInfraError(err)) {
+      await ctx.runMutation(internal.users.refundAIGeneration, {});
+    }
+    throw err;
+  }
+
+  // From here on the call was billed: no refunds for empty/invalid output.
   if (!response.output_parsed) {
     throw new Error("No parsed response from AI");
   }
