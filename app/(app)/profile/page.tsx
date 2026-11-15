@@ -7,6 +7,7 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { User, Settings, LogOut, Save, Check, Target, Scale, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { RestTimerSettings } from "@/app/components/log/rest-timer-settings";
 
 export default function ProfilePage() {
   const { user: clerkUser } = useUser();
@@ -196,6 +197,13 @@ export default function ProfilePage() {
           </Button>
         </div>
       </div>
+
+      {/* Rest Timer */}
+      <RestTimerSettings
+        defaultRestSeconds={userData?.defaultRestSeconds}
+        restTimerSound={userData?.restTimerSound}
+        restTimerVibrate={userData?.restTimerVibrate}
+      />
 
       {/* Account Stats */}
       <div className="card">
